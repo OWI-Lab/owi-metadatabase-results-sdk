@@ -1,6 +1,6 @@
 """Tests for validated results models."""
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -32,9 +32,9 @@ def test_result_query_to_backend_filters() -> None:
     query = ResultQuery(
         analysis_name="LifetimeDesignVerification",
         site_id=10,
-        timestamp_from=datetime(2024, 1, 1, tzinfo=UTC),
+        timestamp_from=datetime(2024, 1, 1, tzinfo=timezone.utc),
     )
     filters = query.to_backend_filters()
     assert filters["analysis__name"] == "LifetimeDesignVerification"
     assert filters["site"] == 10
-    assert filters["data_additional__timestamp_from"].startswith("2024-01-01")
+    assert filters["additional_data__timestamp_from"].startswith("2024-01-01")

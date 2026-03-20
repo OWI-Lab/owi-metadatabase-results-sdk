@@ -34,15 +34,15 @@ repos:
     rev: v0.14.3
     hooks:
       - id: ruff-check
-        files: ^(src/|tests/).*\.py$
+        files: ^(src/|tests/|tasks/|scripts/).*\.py$
       - id: ruff-format
-        files: ^(src/|tests/).*\.py$
+        files: ^(src/|tests/|tasks/|scripts/).*\.py$
 
   - repo: local
     hooks:
       - id: ty
         name: ty type checker
-        entry: uv run ty check src/owi tests
+        entry: uv run ty check --extra-search-path ../owi-metadatabase-sdk/src src tests tasks scripts/*.py
         language: system
         pass_filenames: false
 
@@ -58,10 +58,10 @@ repos:
     hooks:
       - id: deptry
         pass_filenames: false
-        entry: uv run deptry src
+        entry: uv run deptry src scripts
 
   - repo: https://github.com/netromdk/vermin
     rev: v1.7.0
     hooks:
       - id: vermin
-        args: ["-t=3.9-", "--violations", "--eval-annotations", "--backport", "typing", "--no-parse-comments"]
+        args: ["-t=3.10-", "--violations", "--eval-annotations", "--backport", "typing", "--no-parse-comments"]

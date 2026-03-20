@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -15,7 +16,6 @@ from .models import (
     ResultRecordPayload,
     ResultScope,
     ResultSeries,
-    ResultVector,
 )
 
 
@@ -29,6 +29,22 @@ def _optional_int(value: Any) -> int | None:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
     return int(value)
+
+
+def _optional_mapping(value: Any) -> dict[str, Any]:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return {}
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        if isinstance(decoded, Mapping):
+            return dict(decoded)
+        return {}
+    if isinstance(value, Mapping):
+        return dict(value)
+    return {}
 
 
 class DjangoAnalysisSerializer:
@@ -48,7 +64,7 @@ class DjangoAnalysisSerializer:
 
     def from_mapping(self, mapping: Mapping[str, Any]) -> AnalysisDefinition:
         """Deserialize an analysis mapping."""
-        additional_data = mapping.get("additional_data") or mapping.get("data_additional") or {}
+        additional_data = _optional_mapping(mapping.get("additional_data") or mapping.get("data_additional"))
         return AnalysisDefinition(
             name=str(mapping["name"]),
             source_type=str(mapping["source_type"]),
@@ -56,7 +72,7 @@ class DjangoAnalysisSerializer:
             description=_optional_str(mapping.get("description")),
             user=_optional_str(mapping.get("user")),
             timestamp=mapping.get("timestamp"),
-            additional_data=dict(additional_data),
+            additional_data=additional_data,
         )
 
 
@@ -70,27 +86,28 @@ class DjangoResultSerializer:
 
     def from_mapping(self, mapping: Mapping[str, Any]) -> ResultSeries:
         """Deserialize a backend result row."""
-        vectors: list[ResultVector] = [
-            ResultVector(
-                name=str(mapping["name_col1"]),
-                unit=str(mapping["units_col1"]),
-                values=[float(value) for value in mapping["value_col1"]],
-            ),
-            ResultVector(
-                name=str(mapping["name_col2"]),
-                unit=str(mapping["units_col2"]),
-                values=[float(value) for value in mapping["value_col2"]],
-            ),
+        vectors: list[dict[str, Any]] = [
+            {
+                "name": str(mapping["name_col1"]),
+                "unit": str(mapping["units_col1"]),
+                "values": [float(value) for value in mapping["value_col1"]],
+            },
+            {
+                "name": str(mapping["name_col2"]),
+                "unit": str(mapping["units_col2"]),
+                "values": [float(value) for value in mapping["value_col2"]],
+            },
         ]
-        if mapping.get("value_col3") is not None:
+        value_col3 = mapping.get("value_col3")
+        if value_col3 not in (None, []):
             vectors.append(
-                ResultVector(
-                    name=str(mapping["name_col3"]),
-                    unit=str(mapping["units_col3"]),
-                    values=[float(value) for value in mapping["value_col3"]],
-                )
+                {
+                    "name": str(mapping["name_col3"]),
+                    "unit": str(mapping["units_col3"]),
+                    "values": [float(value) for value in value_col3],
+                }
             )
-        data_additional = dict(mapping.get("data_additional") or {})
+        data_additional = _optional_mapping(mapping.get("additional_data") or mapping.get("data_additional"))
         return ResultSeries(
             analysis_name=str(data_additional.get("analysis_name", mapping.get("analysis_name", "unknown"))),
             analysis_kind=AnalysisKind(data_additional.get("analysis_kind", "comparison")),

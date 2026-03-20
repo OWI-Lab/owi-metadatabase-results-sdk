@@ -94,22 +94,53 @@ class AnalysisRegistryProtocol(Protocol):
 class ResultsRepositoryProtocol(Protocol):
     """Protocol for raw result persistence and retrieval."""
 
+    def list_analyses(self, name: str | None = None, **kwargs: Any) -> pd.DataFrame:
+        """Retrieve analysis rows from the backend."""
+
     def list_results(self, query: ResultQuery) -> pd.DataFrame:
         """Retrieve raw rows from the backend."""
 
     def create_analysis(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         """Create an analysis record."""
 
+    def create_result(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Create a single result record."""
+
     def create_results_bulk(self, payloads: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
         """Create multiple result records."""
+
+    def update_result(self, result_id: int, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Patch a single result record."""
 
 
 @runtime_checkable
 class QueryServiceProtocol(Protocol):
     """Protocol for high-level result retrieval and plotting."""
 
+    def deserialize_result_series(
+        self,
+        raw_data: Sequence[Mapping[str, Any]] | pd.DataFrame,
+    ) -> list[ResultSeries]:
+        """Deserialize raw backend rows into typed result series."""
+
+    def get_result_series(
+        self,
+        analysis_name: str,
+        filters: ResultQuery | Mapping[str, Any] | None = None,
+    ) -> list[ResultSeries]:
+        """Return typed persisted series for an analysis."""
+
+    def get_location_frame(self, location_ids: Sequence[int]) -> pd.DataFrame:
+        """Return location metadata required by geo-oriented workflows."""
+
     def get_results(self, analysis_name: str, filters: ResultQuery | Mapping[str, Any] | None = None) -> pd.DataFrame:
         """Return normalized analysis data."""
 
-    def plot_results(self, analysis_name: str, filters: ResultQuery | Mapping[str, Any] | None = None) -> PlotResponse:
+    def plot_results(
+        self,
+        analysis_name: str,
+        filters: ResultQuery | Mapping[str, Any] | None = None,
+        *,
+        plot_type: str | None = None,
+    ) -> PlotResponse:
         """Return a chart for normalized analysis data."""

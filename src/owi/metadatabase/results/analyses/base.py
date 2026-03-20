@@ -25,7 +25,7 @@ class BaseAnalysis:
         return payload
 
     def compute(self, payload: Any) -> pd.DataFrame:
-        """Normalize validated input data."""
+        """Normalize validated analysis inputs."""
         raise NotImplementedError
 
     def to_results(self, payload: Any) -> list[ResultSeries]:
@@ -44,6 +44,6 @@ class BaseAnalysis:
     ) -> PlotResponse:
         """Render results using the default plot strategy."""
         plot_request = request or PlotRequest(analysis_name=self.analysis_name)
-        strategy = plot_strategy or get_plot_strategy(self.default_plot_type)
+        strategy = plot_strategy or get_plot_strategy(plot_request.plot_type or self.default_plot_type)
         data = self.from_results(results)
         return strategy.render(data, plot_request)

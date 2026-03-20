@@ -18,5 +18,9 @@ class ResultsEndpoints:
         """Return a mutation endpoint path with a trailing slash."""
         return endpoint.rstrip("/") + "/"
 
+    def detail_path(self, endpoint: str, object_id: int) -> str:
+        """Return a detail mutation endpoint path with a trailing slash."""
+        return f"{endpoint.rstrip('/')}/{object_id}/"
+
 
 DEFAULT_RESULTS_ENDPOINTS = ResultsEndpoints()

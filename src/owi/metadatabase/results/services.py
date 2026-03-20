@@ -6,10 +6,10 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 import pandas as pd
+from owi.metadatabase.locations.io import LocationsAPI  # ty: ignore[unresolved-import]
 
 from .io import ResultsAPI
 from .models import PlotRequest, PlotResponse, ResultQuery, ResultSeries
-from .plotting import get_plot_strategy
 from .protocols import AnalysisRegistryProtocol, ResultsRepositoryProtocol
 from .registry import default_registry
 from .serializers import DjangoResultSerializer
@@ -21,6 +21,10 @@ class ApiResultsRepository:
     def __init__(self, api: ResultsAPI | None = None) -> None:
         self.api = api or ResultsAPI(token="dummy")
 
+    def list_analyses(self, name: str | None = None, **kwargs: Any) -> pd.DataFrame:
+        """Retrieve analysis rows from the backend."""
+        return self.api.list_analyses(name=name, **kwargs)["data"]
+
     def list_results(self, query: ResultQuery) -> pd.DataFrame:
         """Retrieve raw result rows from the backend."""
         return self.api.list_results(**query.to_backend_filters())["data"]
@@ -29,9 +33,29 @@ class ApiResultsRepository:
         """Create an analysis row."""
         return self.api.create_analysis(dict(payload))
 
+    def create_result(self, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Create a single result row."""
+        return self.api.create_result(dict(payload))
+
     def create_results_bulk(self, payloads: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
         """Create multiple result rows."""
         return self.api.create_results_bulk([dict(payload) for payload in payloads])
+
+    def update_result(self, result_id: int, payload: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Patch a single result row."""
+        return self.api.update_result(result_id, dict(payload))
+
+    def get_location_frame(self, location_ids: Sequence[int]) -> pd.DataFrame:
+        """Retrieve location metadata required by map-oriented plots."""
+        if not location_ids:
+            return pd.DataFrame(columns=["id", "title", "northing", "easting"])
+        location_api = LocationsAPI(api_root=self.api.base_api_root, **self.api._auth_kwargs())
+        assetlocations = location_api.get_assetlocations()["data"]
+        if assetlocations.empty or "id" not in assetlocations.columns:
+            return pd.DataFrame(columns=["id", "title", "northing", "easting"])
+        location_frame = assetlocations[assetlocations["id"].isin(location_ids)].copy()
+        columns = [column for column in ["id", "title", "northing", "easting"] if column in location_frame.columns]
+        return location_frame.loc[:, columns]
 
 
 class ResultsService:
@@ -46,33 +70,97 @@ class ResultsService:
         self.registry = registry or default_registry
         self.serializer = DjangoResultSerializer()
 
-    def get_results(self, analysis_name: str, filters: ResultQuery | Mapping[str, Any] | None = None) -> pd.DataFrame:
-        """Return normalized analysis data for the given analysis."""
+    def _coerce_query(
+        self,
+        analysis_name: str,
+        filters: ResultQuery | Mapping[str, Any] | None = None,
+    ) -> ResultQuery:
+        """Build a concrete query model from loose filter input."""
         query = (
             filters if isinstance(filters, ResultQuery) else ResultQuery(analysis_name=analysis_name, **(filters or {}))
         )
         if query.analysis_name is None:
             query = query.model_copy(update={"analysis_name": analysis_name})
+        return query
+
+    def deserialize_result_series(
+        self,
+        raw_data: Sequence[Mapping[str, Any]] | pd.DataFrame,
+    ) -> list[ResultSeries]:
+        """Deserialize raw backend rows into typed result series."""
+        if isinstance(raw_data, pd.DataFrame):
+            raw_records = cast(list[dict[str, Any]], raw_data.to_dict(orient="records"))
+        else:
+            raw_records = [dict(row) for row in raw_data]
+        return [self.serializer.from_mapping(row) for row in raw_records]
+
+    def get_result_series(
+        self,
+        analysis_name: str,
+        filters: ResultQuery | Mapping[str, Any] | None = None,
+    ) -> list[ResultSeries]:
+        """Fetch and deserialize typed result series for the given analysis."""
+        query = self._coerce_query(analysis_name, filters)
         frame = self.repository.list_results(query)
-        raw_records = cast(list[dict[str, Any]], frame.to_dict(orient="records"))
-        records = [self.serializer.from_mapping(row) for row in raw_records]
+        return self.deserialize_result_series(frame)
+
+    def get_location_frame(self, location_ids: Sequence[int]) -> pd.DataFrame:
+        """Return location metadata for the given backend location identifiers."""
+        columns = ["id", "title", "northing", "easting"]
+        if not location_ids:
+            return pd.DataFrame(columns=columns)
+        get_location_frame = getattr(self.repository, "get_location_frame", None)
+        if not callable(get_location_frame):
+            return pd.DataFrame(columns=columns)
+        location_frame = get_location_frame(location_ids)
+        if not isinstance(location_frame, pd.DataFrame):
+            return pd.DataFrame(columns=columns)
+        if location_frame.empty:
+            return pd.DataFrame(columns=columns)
+        available_columns = [column for column in columns if column in location_frame.columns]
+        selected_frame = cast(pd.DataFrame, location_frame.loc[:, available_columns])
+        return selected_frame.copy()
+
+    def get_results(self, analysis_name: str, filters: ResultQuery | Mapping[str, Any] | None = None) -> pd.DataFrame:
+        """Return normalized analysis data for the given analysis."""
+        records = self.get_result_series(analysis_name, filters)
         analysis = self.registry.get(analysis_name)
         return analysis.from_results(records)
 
-    def plot_results(self, analysis_name: str, filters: ResultQuery | Mapping[str, Any] | None = None) -> PlotResponse:
+    def _plot_context(
+        self,
+        records: Sequence[ResultSeries],
+        *,
+        plot_type: str | None,
+    ) -> dict[str, Any]:
+        """Build optional context required by specific plot types."""
+        context: dict[str, Any] = {}
+        if plot_type not in {"geo", "map"}:
+            return context
+        location_ids = sorted({record.location_id for record in records if record.location_id is not None})
+        location_frame = self.get_location_frame(location_ids)
+        if not location_frame.empty:
+            context["location_frame"] = location_frame
+        return context
+
+    def plot_results(
+        self,
+        analysis_name: str,
+        filters: ResultQuery | Mapping[str, Any] | None = None,
+        *,
+        plot_type: str | None = None,
+    ) -> PlotResponse:
         """Render a chart for the requested analysis."""
-        query = (
-            filters if isinstance(filters, ResultQuery) else ResultQuery(analysis_name=analysis_name, **(filters or {}))
-        )
-        if query.analysis_name is None:
-            query = query.model_copy(update={"analysis_name": analysis_name})
-        frame = self.repository.list_results(query)
-        raw_records = cast(list[dict[str, Any]], frame.to_dict(orient="records"))
-        records: list[ResultSeries] = [self.serializer.from_mapping(row) for row in raw_records]
+        query = self._coerce_query(analysis_name, filters)
+        records = self.get_result_series(analysis_name, query)
         analysis = self.registry.get(analysis_name)
-        plot_request = PlotRequest(analysis_name=analysis_name, filters=query)
-        plot_strategy = get_plot_strategy(analysis.default_plot_type)
-        return analysis.plot(records, request=plot_request, plot_strategy=plot_strategy)
+        plot_request = PlotRequest(
+            analysis_name=analysis_name,
+            filters=query.model_dump(),
+            plot_type=plot_type,
+            context=self._plot_context(records, plot_type=plot_type),
+        )
+        return analysis.plot(records, request=plot_request)
 
 
 def get_results(
@@ -87,7 +175,9 @@ def get_results(
 def plot_results(
     analysis_name: str,
     filters: ResultQuery | Mapping[str, Any] | None = None,
+    *,
+    plot_type: str | None = None,
     service: ResultsService | None = None,
 ) -> PlotResponse:
     """Return a plotted chart using the default service."""
-    return (service or ResultsService()).plot_results(analysis_name, filters)
+    return (service or ResultsService()).plot_results(analysis_name, filters, plot_type=plot_type)

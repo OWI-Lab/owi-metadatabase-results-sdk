@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import StrEnum
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class AnalysisKind(StrEnum):
+class AnalysisKind(str, Enum):
     """Supported analysis categories."""
 
     HISTOGRAM = "histogram"
@@ -17,7 +17,7 @@ class AnalysisKind(StrEnum):
     COMPARISON = "comparison"
 
 
-class ResultScope(StrEnum):
+class ResultScope(str, Enum):
     """Supported result scopes."""
 
     SITE = "site"
@@ -101,8 +101,7 @@ class ResultSeries(BaseModel):
             "location": self.location_id,
             "short_description": self.short_description,
             "description": self.description,
-            "data_additional": {
-                "analysis_name": self.analysis_name,
+            "additional_data": {
                 "analysis_kind": self.analysis_kind.value,
                 "result_scope": self.result_scope.value,
                 **self.data_additional,
@@ -154,7 +153,7 @@ class ResultRecordPayload(BaseModel):
     value_col3: list[float] | None = None
     short_description: str
     description: str | None = None
-    data_additional: dict[str, Any] = Field(default_factory=dict)
+    additional_data: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_lengths(self) -> ResultRecordPayload:
@@ -204,11 +203,11 @@ class ResultQuery(BaseModel):
         if self.short_description is not None:
             filters["short_description"] = self.short_description
         if self.turbine is not None:
-            filters["data_additional__turbine"] = self.turbine
+            filters["additional_data__turbine"] = self.turbine
         if self.timestamp_from is not None:
-            filters["data_additional__timestamp_from"] = self.timestamp_from.isoformat()
+            filters["additional_data__timestamp_from"] = self.timestamp_from.isoformat()
         if self.timestamp_to is not None:
-            filters["data_additional__timestamp_to"] = self.timestamp_to.isoformat()
+            filters["additional_data__timestamp_to"] = self.timestamp_to.isoformat()
         return filters
 
 
@@ -221,6 +220,8 @@ class PlotRequest(BaseModel):
     filters: ResultQuery = Field(default_factory=ResultQuery)
     title: str | None = None
     group_by: str | None = None
+    plot_type: str | None = None
+    context: dict[str, Any] = Field(default_factory=dict)
 
 
 class PlotResponse(BaseModel):

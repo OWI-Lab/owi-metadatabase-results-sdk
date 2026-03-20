@@ -13,17 +13,18 @@ True
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from importlib import import_module
 from typing import Any
 
 import pandas as pd
 import requests
+from owi.metadatabase._utils.exceptions import (  # ty: ignore[unresolved-import]
+    APIConnectionError,
+    InvalidParameterError,
+)
+from owi.metadatabase.io import API  # ty: ignore[unresolved-import]
+from owi.metadatabase.locations.io import LocationsAPI  # ty: ignore[unresolved-import]
 
 from .endpoints import DEFAULT_RESULTS_ENDPOINTS, ResultsEndpoints
-
-API = import_module("owi.metadatabase.io").API
-APIConnectionError = import_module("owi.metadatabase._utils.exceptions").APIConnectionError
-InvalidParameterError = import_module("owi.metadatabase._utils.exceptions").InvalidParameterError
 
 
 class ResultsAPI(API):
@@ -46,6 +47,7 @@ class ResultsAPI(API):
     def __init__(self, api_subdir: str = DEFAULT_RESULTS_ENDPOINTS.api_subdir, **kwargs) -> None:
         self.endpoints: ResultsEndpoints = kwargs.pop("endpoints", DEFAULT_RESULTS_ENDPOINTS)
         super().__init__(**kwargs)
+        self.base_api_root = self.api_root
         self.api_root = self.api_root + api_subdir
 
     def ping(self) -> str:
@@ -108,6 +110,27 @@ class ResultsAPI(API):
             raise APIConnectionError(message=f"Error {response.status_code}.\n{response.reason}", response=response)
         return response
 
+    def _send_detail_json_request(
+        self,
+        endpoint: str,
+        object_id: int,
+        payload: Any,
+        method: str = "patch",
+    ) -> requests.Response:
+        """Send a JSON mutation request to a detail endpoint."""
+        headers = {"Content-Type": "application/json"}
+        url = self.api_root + self.endpoints.detail_path(endpoint, object_id)
+        if self.header is not None:
+            headers.update(self.header)
+            response = requests.request(method, url, headers=headers, json=payload)
+        elif self.auth is not None:
+            response = requests.request(method, url, auth=self.auth, headers=headers, json=payload)
+        else:
+            raise InvalidParameterError("Either header or username/password authentication must be configured.")
+        if response.status_code not in {200, 201}:
+            raise APIConnectionError(message=f"Error {response.status_code}.\n{response.reason}", response=response)
+        return response
+
     @staticmethod
     def _response_to_dataframe(response: requests.Response) -> pd.DataFrame:
         """Convert a POST response body into a DataFrame."""
@@ -140,6 +163,17 @@ class ResultsAPI(API):
             "response": response,
         }
 
+    def update_result(self, result_id: int, payload: Mapping[str, Any]) -> dict[str, Any]:
+        """Patch a single result row."""
+        response = self._send_detail_json_request(self.endpoints.result, result_id, dict(payload), method="patch")
+        df = self._response_to_dataframe(response)
+        return {
+            "data": df,
+            "exists": not df.empty,
+            "id": df["id"].iloc[0] if "id" in df and not df.empty else result_id,
+            "response": response,
+        }
+
     def create_results_bulk(self, payloads: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         """Create multiple result rows in one request.
 
@@ -169,22 +203,58 @@ class ResultsAPI(API):
         """Backward-compatible wrapper for list_analyses."""
         return self.list_analyses(name=name)
 
+    def _auth_kwargs(self) -> dict[str, Any]:
+        """Return authentication kwargs for auxiliary API clients."""
+        if self.header is not None:
+            return {"header": self.header}
+        if self.uname is not None and self.password is not None:
+            return {"uname": self.uname, "password": self.password}
+        raise InvalidParameterError("Either header or username/password authentication must be configured.")
+
+    @staticmethod
+    def _empty_list_response() -> dict[str, Any]:
+        """Return an empty list-style response payload."""
+        return {"data": pd.DataFrame(), "exists": False, "response": None}
+
     def get_results(
         self,
         assetlocation: str | None = None,
         projectsite: str | None = None,
-        analysis: str | None = None,
+        analysis: str | int | None = None,
         short_description: str | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Backward-compatible wrapper for list_results with friendly filters."""
         url_params = dict(kwargs)
+        location_api = LocationsAPI(api_root=self.base_api_root, **self._auth_kwargs())
+
         if projectsite is not None:
-            url_params["site__title"] = projectsite
+            site_response = location_api.get_projectsite_detail(projectsite=projectsite)
+            if not site_response["exists"] or site_response["id"] is None:
+                return self._empty_list_response()
+            url_params["site"] = int(site_response["id"])
         if assetlocation is not None:
-            url_params["location__title"] = assetlocation
-        if analysis is not None:
-            url_params["analysis__name"] = analysis
+            location_response = location_api.get_assetlocation_detail(assetlocation=assetlocation, projectsite=projectsite)
+            if not location_response["exists"] or location_response["id"] is None:
+                return self._empty_list_response()
+            url_params["location"] = int(location_response["id"])
         if short_description is not None:
             url_params["short_description"] = short_description
-        return self.list_results(**url_params)
+
+        if analysis is None:
+            return self.list_results(**url_params)
+
+        if isinstance(analysis, int):
+            return self.list_results(analysis=analysis, **url_params)
+
+        analysis_frame = self.list_analyses(name=analysis)["data"]
+        if analysis_frame.empty or "id" not in analysis_frame:
+            return self._empty_list_response()
+
+        analysis_ids = analysis_frame["id"].dropna().astype(int).tolist()
+        if not analysis_ids:
+            return self._empty_list_response()
+
+        frames = [self.list_results(analysis=analysis_id, **url_params)["data"] for analysis_id in analysis_ids]
+        data = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        return {"data": data, "exists": not data.empty, "response": None}

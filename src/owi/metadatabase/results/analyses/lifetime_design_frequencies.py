@@ -8,7 +8,12 @@ from typing import Any
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..models import AnalysisKind, ResultScope, ResultSeries, ResultVector
+from ..frequency_plots import (
+    plot_lifetime_design_frequencies_by_location,
+    plot_lifetime_design_frequencies_comparison,
+    plot_lifetime_design_frequencies_geo,
+)
+from ..models import AnalysisKind, PlotRequest, PlotResponse, ResultScope, ResultSeries
 from ..registry import register_analysis
 from .base import BaseAnalysis
 
@@ -46,6 +51,7 @@ class LifetimeDesignFrequencies(BaseAnalysis):
     default_plot_type = "comparison"
 
     metric_columns = ("fa1", "ss1", "fa2", "ss2")
+    reference_labels_key = "reference_labels"
 
     def validate_inputs(self, payload: Any) -> LifetimeDesignFrequenciesInput:
         """Validate frequency comparison request data."""
@@ -70,9 +76,19 @@ class LifetimeDesignFrequencies(BaseAnalysis):
                         "turbine": row.turbine,
                         "metric": metric.upper(),
                         "reference": row.reference,
+                        "location_id": row.location_id,
+                        "site_id": row.site_id,
                     }
                 )
         return pd.DataFrame(rows)
+
+    @staticmethod
+    def _split_series_description(short_description: str) -> tuple[str, str | None]:
+        """Split the persisted short description into turbine and metric parts."""
+        if " - " not in short_description:
+            return short_description, None
+        turbine, metric = short_description.rsplit(" - ", 1)
+        return turbine, metric
 
     def to_results(self, payload: Any) -> list[ResultSeries]:
         """Convert design frequency rows to persisted result series."""
@@ -87,7 +103,7 @@ class LifetimeDesignFrequencies(BaseAnalysis):
         results: list[ResultSeries] = []
         for (turbine, metric, site_id, location_id), rows in grouped.items():
             ordered_rows = list(rows)
-            x_labels = [item.reference for item in ordered_rows]
+            x_labels = [str(item.reference) for item in ordered_rows]
             x_indices = [float(index) for index, _ in enumerate(ordered_rows)]
             y_values = [float(getattr(item, metric.lower())) for item in ordered_rows]
             results.append(
@@ -99,14 +115,11 @@ class LifetimeDesignFrequencies(BaseAnalysis):
                     site_id=site_id,
                     location_id=location_id,
                     data_additional={
-                        "turbine": turbine,
-                        "metric": metric,
-                        "reference_labels": x_labels,
-                        "series_key": f"{turbine}:{metric}",
+                        self.reference_labels_key: x_labels,
                     },
                     vectors=[
-                        ResultVector(name="reference_index", unit="index", values=x_indices),
-                        ResultVector(name=metric.lower(), unit="Hz", values=y_values),
+                        {"name": "reference_index", "unit": "index", "values": x_indices},
+                        {"name": metric.lower(), "unit": "Hz", "values": y_values},
                     ],
                 )
             )
@@ -118,7 +131,8 @@ class LifetimeDesignFrequencies(BaseAnalysis):
         for result in results:
             x_values = result.vectors[0].values
             y_values = result.vectors[1].values
-            labels = result.data_additional.get("reference_labels", [])
+            labels = self._reference_labels_from_result(result)
+            turbine, metric = self._split_series_description(result.short_description)
             for index, (x_value, y_value) in enumerate(zip(x_values, y_values, strict=False)):
                 label = labels[index] if index < len(labels) else str(x_value)
                 rows.append(
@@ -126,9 +140,43 @@ class LifetimeDesignFrequencies(BaseAnalysis):
                         "x": label,
                         "y": y_value,
                         "series_name": result.short_description,
-                        "turbine": result.data_additional.get("turbine", result.short_description),
-                        "metric": result.data_additional.get("metric", result.vectors[1].name.upper()),
+                        "turbine": turbine,
+                        "metric": metric or result.vectors[1].name.upper(),
                         "reference": label,
+                        "location_id": result.location_id,
+                        "site_id": result.site_id,
                     }
                 )
         return pd.DataFrame(rows)
+
+    def _reference_labels_from_result(self, result: ResultSeries) -> list[str]:
+        """Return the per-point reference labels stored in result metadata."""
+        value = result.data_additional.get(self.reference_labels_key, [])
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, Sequence):
+            return [str(item) for item in value]
+        return []
+
+    def plot(
+        self,
+        results: Sequence[ResultSeries],
+        request: PlotRequest | None = None,
+        plot_strategy: Any | None = None,
+    ) -> PlotResponse:
+        """Render frequencies using the requested plot type."""
+        del plot_strategy
+        plot_request = request or PlotRequest(analysis_name=self.analysis_name)
+        plot_type = plot_request.plot_type or "location"
+        location_frame = plot_request.context.get("location_frame")
+        data = self.from_results(results)
+
+        if plot_type == "comparison":
+            return plot_lifetime_design_frequencies_comparison(data, location_frame=location_frame)
+        if plot_type == "location":
+            return plot_lifetime_design_frequencies_by_location(data, location_frame=location_frame)
+        if plot_type in {"geo", "map"}:
+            if not isinstance(location_frame, pd.DataFrame) or location_frame.empty:
+                raise ValueError("Location coordinates are required for the geo lifetime design frequency plot.")
+            return plot_lifetime_design_frequencies_geo(data, location_frame=location_frame)
+        raise ValueError(f"Unsupported plot_type for {self.analysis_name}: {plot_type}")
