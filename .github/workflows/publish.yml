@@ -1,0 +1,105 @@
+name: Publish Python package
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: Git ref to checkout for publishing.
+        required: false
+        type: string
+        default: main
+      publish_mode:
+        description: Whether this publish is a manual main-branch publish or an automated release-tag publish.
+        required: true
+        type: choice
+        options:
+          - manual
+          - release-tag
+        default: manual
+      confirm_publish:
+        description: Confirm manual publish of the current main branch to PyPI
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    if: ${{ inputs.publish_mode == 'release-tag' || inputs.confirm_publish == true }}
+    runs-on: ubuntu-latest
+    outputs:
+      published_version: ${{ steps.package_version.outputs.version }}
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.target_ref || github.ref_name || 'main' }}
+    - name: Require main branch for manual publish
+      if: ${{ inputs.publish_mode == 'manual' }}
+      run: |
+        publish_ref="${{ inputs.target_ref || github.ref_name || 'main' }}"
+        if [[ "${publish_ref}" != "main" ]]; then
+          echo "Manual publish is only allowed from the main branch." >&2
+          exit 1
+        fi
+    - name: Require tag ref for automated release publish
+      if: ${{ inputs.publish_mode == 'release-tag' }}
+      run: |
+        publish_ref="${{ inputs.target_ref || github.ref_name }}"
+        if [[ ! "${publish_ref}" =~ ^v[0-9] ]]; then
+          echo "Automated release publish requires a version tag ref, got '${publish_ref}'." >&2
+          exit 1
+        fi
+    - name: Set up Python "3.13"
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        python-version: "3.13"
+        enable-cache: true
+    - name: Install dependencies
+      run: uv sync --dev
+    - name: Build package
+      run: uv build
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+    - name: Resolve published version
+      id: package_version
+      run: |
+        echo "version=$(uv version --short)" >> "$GITHUB_OUTPUT"
+    - name: Summarize manual publish
+      if: ${{ inputs.publish_mode == 'manual' }}
+      run: |
+        {
+          echo "## Manual Package Publish"
+          echo
+          echo "- Source branch: ${{ inputs.target_ref || github.ref_name || 'main' }}"
+          echo "- Published version: $(uv version --short)"
+          echo "- Trigger: workflow_dispatch"
+        } >> "$GITHUB_STEP_SUMMARY"
+    - name: Summarize automated release publish
+      if: ${{ inputs.publish_mode == 'release-tag' }}
+      run: |
+        {
+          echo "## Release Package Publish"
+          echo
+          echo "- Source tag: ${{ inputs.target_ref || github.ref_name }}"
+          echo "- Published version: $(uv version --short)"
+          echo "- Trigger: workflow_dispatch"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+  documentation:
+    if: ${{ needs.publish.result == 'success' }}
+    needs: [publish]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/docs.yml
+    with:
+      target_ref: ${{ inputs.target_ref || github.ref_name || 'main' }}
+      docs_version: ${{ needs.publish.outputs.published_version }}
+      docs_alias: ${{ needs.publish.outputs.published_version }}
+      set_default: true
+    secrets: inherit

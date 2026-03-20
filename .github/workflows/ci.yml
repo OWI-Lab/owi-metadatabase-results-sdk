@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: ${{ ! contains(github.event.head_commit.message, 'Bumpversion') }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.14"
+          # - "3.13"
+          # - "3.12"
+          # - "3.11"
+          # - "3.10"
+          # - "3.9"
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Run tests via invoke
+        run: uv run invoke test.run
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-${{ matrix.python-version }}
+          path: _build/htmlcov
+
+  quality:
+    if: ${{ ! contains(github.event.head_commit.message, 'Bumpversion') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Set up Python "3.14"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Run quality checks via invoke
+        run: uv run invoke qa.all
+
+  docs:
+    if: ${{ ! contains(github.event.head_commit.message, 'Bumpversion') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+      - name: Set up Python "3.14"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Build docs via invoke
+        run: uv run invoke docs.build
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-site
+          path: site/

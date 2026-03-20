@@ -1,0 +1,14 @@
+---
+project_name: owi-metadatabase-results
+project_slug: owi.metadatabase.results
+start_port: 8000
+
+src_dir: src
+test_dir: tests
+docs_dir: docs
+
+build_dir: _build
+dist_dir: dist
+site_dir: site
+
+python_version: "3.13"

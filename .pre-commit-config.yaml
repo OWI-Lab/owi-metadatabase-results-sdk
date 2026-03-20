@@ -1,0 +1,67 @@
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+  - pre-push
+
+default_stages:
+  - pre-commit
+  - pre-push
+
+fail_fast: true
+
+repos:
+  - repo: meta
+    hooks:
+      - id: check-hooks-apply
+      - id: check-useless-excludes
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ["--unsafe"]
+      - id: check-added-large-files
+        args:
+          - --maxkb=10000
+      # - id: check-json
+      # - id: check-xml
+      - id: check-case-conflict
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.3
+    hooks:
+      - id: ruff-check
+        files: ^(src/|tests/).*\.py$
+      - id: ruff-format
+        files: ^(src/|tests/).*\.py$
+
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty type checker
+        entry: uv run ty check src/owi tests
+        language: system
+        pass_filenames: false
+
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+  - repo: https://github.com/fpgmaas/deptry.git
+    rev: "0.23.1"
+    hooks:
+      - id: deptry
+        pass_filenames: false
+        entry: uv run deptry src
+
+  - repo: https://github.com/netromdk/vermin
+    rev: v1.7.0
+    hooks:
+      - id: vermin
+        args: ["-t=3.9-", "--violations", "--eval-annotations", "--backport", "typing", "--no-parse-comments"]

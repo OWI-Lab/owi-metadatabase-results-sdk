@@ -1,0 +1,55 @@
+name: Release Preview
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
+
+concurrency:
+  group: release-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Set up Python "3.13"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --dev  # I do not want to use the lock file here since we want to test the release candidate with the latest dependencies, not necessarily the ones from the last release
+
+      - name: Resolve release plan
+        id: release_plan
+        run: |
+          python .github/scripts/release_version.py plan \
+            --labels-json '${{ toJson(github.event.pull_request.labels.*.name) }}' \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Summarize release preview
+        run: |
+          {
+            echo "## Release Preview"
+            echo
+            echo "- Current version: ${{ steps.release_plan.outputs.current_version }}"
+            echo "- Release bump: ${{ steps.release_plan.outputs.bump_type }}"
+            echo "- Next version on merge: v${{ steps.release_plan.outputs.next_version }}"
+            echo
+            echo "Supported labels: release:major, release:minor, release:patch"
+            echo "Default behavior without a release label: patch"
+          } >> "$GITHUB_STEP_SUMMARY"

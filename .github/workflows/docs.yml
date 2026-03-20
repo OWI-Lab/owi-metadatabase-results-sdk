@@ -1,0 +1,138 @@
+name: Documentation
+
+on:
+  workflow_call:
+    inputs:
+      target_ref:
+        description: Git ref to checkout for documentation publishing.
+        required: false
+        type: string
+      publish_mode:
+        description: Publish mode associated with the docs deployment.
+        required: false
+        type: string
+        default: manual
+      confirm_publish:
+        description: Whether the originating publish was explicitly confirmed.
+        required: false
+        type: boolean
+        default: false
+      docs_version:
+        description: Documentation version to publish.
+        required: false
+        type: string
+        default: dev
+      docs_alias:
+        description: Documentation alias to publish.
+        required: false
+        type: string
+        default: dev
+      set_default:
+        description: Whether to set the published version as the default docs version.
+        required: false
+        type: boolean
+        default: true
+  workflow_dispatch:
+    inputs:
+      target_ref:
+        description: Git ref to checkout for documentation publishing.
+        required: false
+        type: string
+        default: main
+      publish_mode:
+        description: Publish mode associated with the docs deployment.
+        required: false
+        type: choice
+        options:
+          - manual
+          - release-tag
+        default: manual
+      confirm_publish:
+        description: Whether this manual docs run was explicitly confirmed.
+        required: false
+        type: boolean
+        default: false
+      docs_version:
+        description: Documentation version to publish.
+        required: false
+        type: string
+        default: dev
+      docs_alias:
+        description: Documentation alias to publish.
+        required: false
+        type: string
+        default: dev
+      set_default:
+        description: Whether to set the published version as the default docs version.
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: docs-${{ inputs.docs_version || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.target_ref || github.event.inputs.target_ref || github.ref_name }}
+          fetch-depth: 0
+      - name: Set up Python "3.14"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.14"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Resolve docs publication arguments
+        id: docs_args
+        env:
+          INPUT_TARGET_REF: ${{ inputs.target_ref || github.event.inputs.target_ref || github.ref_name }}
+          INPUT_PUBLISH_MODE: ${{ inputs.publish_mode || github.event.inputs.publish_mode || 'manual' }}
+          INPUT_CONFIRM_PUBLISH: ${{ inputs.confirm_publish || github.event.inputs.confirm_publish || 'false' }}
+          INPUT_DOCS_VERSION: ${{ inputs.docs_version || github.event.inputs.docs_version || 'dev' }}
+          INPUT_DOCS_ALIAS: ${{ inputs.docs_alias || github.event.inputs.docs_alias || 'dev' }}
+          INPUT_SET_DEFAULT: ${{ inputs.set_default || github.event.inputs.set_default || 'true' }}
+        run: |
+          echo "target_ref=${INPUT_TARGET_REF}" >> "$GITHUB_OUTPUT"
+          echo "publish_mode=${INPUT_PUBLISH_MODE}" >> "$GITHUB_OUTPUT"
+          echo "confirm_publish=${INPUT_CONFIRM_PUBLISH}" >> "$GITHUB_OUTPUT"
+          echo "version=${INPUT_DOCS_VERSION#v}" >> "$GITHUB_OUTPUT"
+          echo "alias=${INPUT_DOCS_ALIAS#v}" >> "$GITHUB_OUTPUT"
+          echo "set_default=${INPUT_SET_DEFAULT}" >> "$GITHUB_OUTPUT"
+      - name: Deploy versioned docs with mike
+        run: |
+          uv run invoke docs.deploy-version \
+            --version "${{ steps.docs_args.outputs.version }}" \
+            --alias "${{ steps.docs_args.outputs.alias }}"
+      - name: Set default docs version
+        if: ${{ steps.docs_args.outputs.set_default == 'true' }}
+        run: |
+          uv run invoke docs.set-default-version \
+            --version "${{ steps.docs_args.outputs.version }}"
+      - name: Summarize docs publish
+        run: |
+          {
+            echo "## Documentation Publish"
+            echo
+            echo "- Source ref: ${{ steps.docs_args.outputs.target_ref }}"
+            echo "- Publish mode: ${{ steps.docs_args.outputs.publish_mode }}"
+            echo "- Publish confirmed: ${{ steps.docs_args.outputs.confirm_publish }}"
+            echo "- Docs version: ${{ steps.docs_args.outputs.version }}"
+            echo "- Docs alias: ${{ steps.docs_args.outputs.alias }}"
+            echo "- Default version updated: ${{ steps.docs_args.outputs.set_default }}"
+          } >> "$GITHUB_STEP_SUMMARY"

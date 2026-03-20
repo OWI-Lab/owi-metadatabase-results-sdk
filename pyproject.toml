@@ -1,0 +1,149 @@
+[project]
+name = "owi-metadatabase-results"
+version = "0.1.0"
+description = "Results extension for OWI Metadatabase SDK"
+authors = [
+    { name = "Pietro D'Antuono", email = "pietro.dantuono@vub.be" }
+]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.13,<3.15"
+
+keywords = ["owimetadatabase", "extension", "results"]
+
+classifiers = [
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "owi-metadatabase>=0.1.2",
+    "pydantic>=2.11.0",
+    "pyecharts>=2.0.8",
+    "rich>=14.1.0",
+    "openpyxl>=3.1.5",
+]
+
+[dependency-groups]
+dev = [
+    {include-group = "test"},
+    {include-group = "lint"},
+    {include-group = "typing"},
+    {include-group = "docs"},
+    {include-group = "dev-tools"},
+]
+test = [
+    "pytest >=8.4.0",
+    "pytest-mock >=3.15.0",
+    "pytest-xdist >=3.7.0",
+    "pytest-clarity >=1.0.0",
+    "pytest-cov >=7.0.0",
+    "requests-mock >=1.12.1",
+    "hypothesis >=6.100.0"
+]
+lint = [
+    "ruff>=0.12.9",
+]
+typing = [
+    "ty >=0.0.14",
+    "pandas-stubs >=2.0.0,<2.2.3.241009 ; python_version < '3.10'",
+    "pandas-stubs >=2.2.3.241009 ; python_version >= '3.10'",
+    "types-requests >=2.32.0",
+]
+docs = [
+    "mkdocs >=1.6.0",
+    "mkdocs-material >=9.5.0",
+    "mkdocstrings[python] >=0.27.0",
+    "griffe <2.0.0",
+    "mkdocs-jupyter >=0.25.0",
+    "mkdocs-git-revision-date-localized-plugin >=1.3.0",
+    "mkdocs-minify-plugin >=0.8.0",
+    "mike >=2.0.0",
+]
+dev-tools = [
+    "bump2version>=1.0.1",
+    "invoke>=2.2.0",
+    "pre-commit>=3.0.0",
+    "deptry >=0.23.1"
+]
+
+[project.urls]
+homepage = "https://owi-lab.github.io/owi-metadatabase-sdk/"
+repository = "https://github.com/OWI-Lab/owi-metadatabase-results-sdk/"
+documentation = "https://owi-lab.github.io/owi-metadatabase-results-sdk/"
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/owi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = [
+    "-v",
+    "--import-mode=importlib",
+    "--strict-markers",
+    "--tb=short",
+    "--cov=src/owi/metadatabase/results",
+    "--cov-report=html",
+    "--cov-report=term-missing:skip-covered",
+    "--doctest-modules",
+    "--doctest-continue-on-failure",
+    "--doctest-glob=*.md",
+]
+doctest_optionflags = [
+    "NORMALIZE_WHITESPACE",
+    "ELLIPSIS",
+    "NUMBER",
+    "IGNORE_EXCEPTION_DETAIL",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "D", "UP", "B", "C4", "SIM"]
+ignore = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
+    "D205",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.isort]
+known-first-party = ["owi.metadatabase.results"]
+
+[tool.uv.workspace]
+members = ["."]
+
+[[tool.uv.index]]
+name = "testpypi"
+url = "https://test.pypi.org/simple"
+explicit = true
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["pyproj", "tqdm", "scipy", "sklearn"]
+DEP003 = ["owi"]
+DEP004 = ["owi"]
+
+# [tool.uv.sources]
+# owi-metadatabase = { index = "testpypi" }
