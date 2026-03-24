@@ -1,21 +1,42 @@
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.so
-*.egg-info/
-.venv/
-.uv/
-.python-version
-.env
-.DS_Store
-.vscode/
-.idea/
-coverage.xml
-htmlcov/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+# Packages
+__pycache__
+
+# Unit test / coverage reports
+.coverage
+.pytest_cache
+.nox
+.hypothesis/
+.cache/
 site/
-dist/
-_build/
+htmlcov/
+
+# Log files
+*.log
+
+# Environment vars files
+.env
+
+# Pyenv
+.python-version
+
+# Environment directories
+.venv/
+
+# Hypothesis
+.hypothesis/
+
+# To do
+.todo
+
+# Documentation
+docs/_build/
+docs/generated/
+site/  # Documentation build output
+
+# Linter/formatter
+.ruff_cache/
+
+# OS specific
+.DS_Store
+
+.vscode/
