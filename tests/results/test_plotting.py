@@ -175,6 +175,7 @@ class TestBuildDropdownPlotResponse:
         chart.add_xaxis(["a"])
         chart.add_yaxis("S1", [1])
         response = build_dropdown_plot_response({"FA1": chart}, dropdown_label="Metric")
+        assert response.notebook is not None
         assert "ResizeObserver" in response.notebook.data
         assert "window.frameElement.style.height" in response.notebook.data
 
@@ -183,13 +184,16 @@ class TestBuildDropdownPlotResponse:
         chart.add_xaxis(["a"])
         chart.add_yaxis("S1", [1])
         widget_sentinel = object()
-        with patch(
-            "owi.metadatabase.results.plotting.response.HTML",
-            return_value=widget_sentinel,
-        ) as html_builder, patch(
-            "owi.metadatabase.results.plotting.response._build_widget_dropdown",
-            return_value=object(),
-        ) as widget_builder:
+        with (
+            patch(
+                "owi.metadatabase.results.plotting.response.HTML",
+                return_value=widget_sentinel,
+            ) as html_builder,
+            patch(
+                "owi.metadatabase.results.plotting.response._build_widget_dropdown",
+                return_value=object(),
+            ) as widget_builder,
+        ):
             response = build_dropdown_plot_response({"key1": chart}, dropdown_label="Metric")
         html_builder.assert_called_once()
         widget_builder.assert_not_called()
@@ -200,10 +204,13 @@ class TestBuildDropdownPlotResponse:
         chart.add_xaxis(["a"])
         chart.add_yaxis("S1", [1])
         widget_sentinel = object()
-        with patch("owi.metadatabase.results.plotting.response.HTML", None), patch(
-            "owi.metadatabase.results.plotting.response._build_widget_dropdown",
-            return_value=widget_sentinel,
-        ) as widget_builder:
+        with (
+            patch("owi.metadatabase.results.plotting.response.HTML", None),
+            patch(
+                "owi.metadatabase.results.plotting.response._build_widget_dropdown",
+                return_value=widget_sentinel,
+            ) as widget_builder,
+        ):
             response = build_dropdown_plot_response({"key1": chart}, dropdown_label="Metric")
         widget_builder.assert_called_once()
         assert response.notebook is widget_sentinel
@@ -285,13 +292,16 @@ class TestBuildNestedDropdownPlotResponse:
         chart.add_xaxis(["a"])
         chart.add_yaxis("S1", [1])
         widget_sentinel = object()
-        with patch(
-            "owi.metadatabase.results.plotting.response.HTML",
-            return_value=widget_sentinel,
-        ) as html_builder, patch(
-            "owi.metadatabase.results.plotting.response._build_nested_widget_dropdown",
-            return_value=object(),
-        ) as widget_builder:
+        with (
+            patch(
+                "owi.metadatabase.results.plotting.response.HTML",
+                return_value=widget_sentinel,
+            ) as html_builder,
+            patch(
+                "owi.metadatabase.results.plotting.response._build_nested_widget_dropdown",
+                return_value=object(),
+            ) as widget_builder,
+        ):
             response = build_nested_dropdown_plot_response(
                 {"FA1": {"INFL": chart}},
                 primary_label="Metric",
@@ -306,10 +316,13 @@ class TestBuildNestedDropdownPlotResponse:
         chart.add_xaxis(["a"])
         chart.add_yaxis("S1", [1])
         widget_sentinel = object()
-        with patch("owi.metadatabase.results.plotting.response.HTML", None), patch(
-            "owi.metadatabase.results.plotting.response._build_nested_widget_dropdown",
-            return_value=widget_sentinel,
-        ) as widget_builder:
+        with (
+            patch("owi.metadatabase.results.plotting.response.HTML", None),
+            patch(
+                "owi.metadatabase.results.plotting.response._build_nested_widget_dropdown",
+                return_value=widget_sentinel,
+            ) as widget_builder,
+        ):
             response = build_nested_dropdown_plot_response(
                 {"FA1": {"INFL": chart}},
                 primary_label="Metric",

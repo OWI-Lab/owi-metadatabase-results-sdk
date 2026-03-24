@@ -15,7 +15,7 @@ from owi.metadatabase.results.models import AnalysisKind, ResultScope
 
 class TestFrequencyRow:
     def test_alias_fields(self) -> None:
-        row = FrequencyRow(turbine="A01", reference="INFL", FA1=0.34, SS1=0.35)
+        row = FrequencyRow(turbine="A01", reference="INFL", FA1=0.34, SS1=0.35)  # ty: ignore[unknown-argument]
         assert row.fa1 == 0.34
         assert row.ss1 == 0.35
         assert row.metric_values() == {"FA1": 0.34, "SS1": 0.35}
@@ -29,12 +29,12 @@ class TestFrequencyRow:
         assert row.metric_values() == {}
 
     def test_dynamic_metrics_are_supported(self) -> None:
-        row = FrequencyRow(turbine="A01", reference="INFL", FA3=0.36, tors1=0.42)
+        row = FrequencyRow(turbine="A01", reference="INFL", FA3=0.36, tors1=0.42)  # ty: ignore[unknown-argument]
         assert row.metric_values() == {"FA3": 0.36, "TORS1": 0.42}
 
     def test_invalid_dynamic_metric_value_raises(self) -> None:
         with pytest.raises(ValidationError, match="float"):
-            FrequencyRow(turbine="A01", reference="INFL", FA3="not-a-number")
+            FrequencyRow(turbine="A01", reference="INFL", FA3="not-a-number")  # ty: ignore[unknown-argument]
 
 
 class TestLifetimeDesignFrequenciesInput:
@@ -57,7 +57,7 @@ class TestLifetimeDesignFrequencies:
 
     def test_validate_inputs_passthrough(self) -> None:
         analysis = LifetimeDesignFrequencies()
-        inp = LifetimeDesignFrequenciesInput(rows=[FrequencyRow(turbine="A", reference="R", FA1=0.3)])
+        inp = LifetimeDesignFrequenciesInput(rows=[FrequencyRow(turbine="A", reference="R", FA1=0.3)])  # ty: ignore[unknown-argument]
         assert analysis.validate_inputs(inp) is inp
 
     def test_compute_produces_long_table(self) -> None:

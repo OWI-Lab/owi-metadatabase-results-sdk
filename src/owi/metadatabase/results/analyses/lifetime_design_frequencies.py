@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field

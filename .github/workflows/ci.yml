@@ -68,7 +68,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
       - name: Run quality checks via invoke
-        run: uv run invoke qa.all
+        run: uv run invoke qa
 
   docs:
     if: ${{ ! contains(github.event.head_commit.message, 'Bumpversion') }}

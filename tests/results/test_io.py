@@ -3,7 +3,10 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 import requests
-from owi.metadatabase._utils.exceptions import APIConnectionError, InvalidParameterError
+from owi.metadatabase._utils.exceptions import (  # ty: ignore[unresolved-import]
+    APIConnectionError,
+    InvalidParameterError,
+)
 
 from owi.metadatabase.results import DEFAULT_RESULTS_ENDPOINTS, ResultsAPI
 

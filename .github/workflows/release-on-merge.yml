@@ -55,7 +55,7 @@ jobs:
       - name: Validate release candidate
         run: |
           uv run invoke test.run
-          uv run invoke qa.all
+          uv run invoke qa
           uv run invoke docs.build
 
       - name: Apply release version

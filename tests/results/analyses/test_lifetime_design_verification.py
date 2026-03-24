@@ -20,7 +20,7 @@ class TestVerificationRow:
         row = VerificationRow(
             timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
             turbine="A01",
-            FA1=0.356,
+            FA1=0.356,  # ty: ignore[unknown-argument]
         )
         assert row.fa1 == 0.356
 
@@ -29,7 +29,7 @@ class TestVerificationRow:
             VerificationRow(
                 timestamp=datetime(2024, 1, 1),
                 turbine="A01",
-                FA1=0.356,
+                FA1=0.356,  # ty: ignore[unknown-argument]
             )
 
 
@@ -62,7 +62,7 @@ class TestLifetimeDesignVerification:
                 VerificationRow(
                     timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
                     turbine="A01",
-                    FA1=0.356,
+                    FA1=0.356,  # ty: ignore[unknown-argument]
                 )
             ]
         )

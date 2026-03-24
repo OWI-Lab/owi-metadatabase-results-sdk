@@ -40,6 +40,9 @@ class StubRepository:
     def update_result(self, result_id: int, payload: Any) -> dict[str, Any]:
         return {"id": result_id, "item": payload}
 
+    def get_location_frame(self, location_ids: Any) -> pd.DataFrame:
+        return pd.DataFrame()
+
 
 class StubLocationRepository(StubRepository):
     """Repository stub that also exposes location metadata for geo plots."""
@@ -48,7 +51,7 @@ class StubLocationRepository(StubRepository):
         super().__init__(frame)
         self.location_frame = location_frame
 
-    def get_location_frame(self, location_ids: list[int]) -> pd.DataFrame:
+    def get_location_frame(self, location_ids: Any) -> pd.DataFrame:
         return self.location_frame[self.location_frame["id"].isin(location_ids)].copy()
 
 
@@ -158,7 +161,7 @@ def test_results_service_deserialize_result_series_from_dataframe() -> None:
     result = service.deserialize_result_series(frame)
 
     assert len(result) == 1
-    assert result[0] == serializer.from_mapping(frame.to_dict(orient="records")[0])
+    assert result[0] == serializer.from_mapping(frame.to_dict(orient="records")[0])  # ty: ignore[invalid-argument-type]
     assert len(result[0].vectors) == 2
 
 
@@ -508,10 +511,10 @@ class TestGetLocationFrameEdgeCases:
         """If get_location_frame returns non-DataFrame, service returns empty schema."""
 
         class BadLocationRepo(StubRepository):
-            def get_location_frame(self, location_ids: list[int]) -> str:  # type: ignore[override]
+            def get_location_frame(self, location_ids: list[int]) -> str:  # ty: ignore[invalid-method-override]
                 return "not a frame"
 
-        service = ResultsService(repository=BadLocationRepo(pd.DataFrame()))
+        service = ResultsService(repository=BadLocationRepo(pd.DataFrame()))  # ty: ignore[invalid-argument-type]
         frame = service.get_location_frame([9])
         assert frame.empty
 

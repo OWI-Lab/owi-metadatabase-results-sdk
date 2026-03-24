@@ -234,7 +234,7 @@ def _build_iframe_notebook_html(html: str, *, frame_height: int) -> Any | None:
 """.strip()
     escaped_srcdoc = escape(f"{html}\n{iframe_resizer}", quote=True)
     iframe_html = (
-        '<iframe '
+        "<iframe "
         'class="owi-results-plot-frame" '
         'sandbox="allow-scripts allow-same-origin" '
         'referrerpolicy="no-referrer" '
@@ -269,9 +269,7 @@ def _custom_dropdown_markup(
     item_markup = "".join(
         (
             '<button type="button" '
-            'class="owi-results-dropdown-item'
-            + (' is-selected' if value == selected_value else '')
-            + '" '
+            'class="owi-results-dropdown-item' + (" is-selected" if value == selected_value else "") + '" '
             'data-role="item" '
             f'data-value="{value}" '
             f'data-label="{item_label}" '
@@ -495,7 +493,9 @@ def build_dropdown_plot_response(
     load_callback_name = f"renderWhenReady_{chart_id}"
     for _, chart in charts_by_key.items():
         _apply_monospace_theme(chart)
-    dependencies = list(dict.fromkeys(dependency for chart in charts_by_key.values() for dependency in chart.js_dependencies.items))
+    dependencies = list(
+        dict.fromkeys(dependency for chart in charts_by_key.values() for dependency in chart.js_dependencies.items)
+    )
     options_map = (
         "{\n" + ",\n".join(f"{json.dumps(key)}: {chart.dump_options()}" for key, chart in charts_by_key.items()) + "\n}"
     )
@@ -586,7 +586,7 @@ def build_dropdown_plot_response(
                     activeChart.resize();
                 }}
                 window.addEventListener('resize', function() {{ if (chart) {{ chart.resize(); }} }});
-                {_initial_render_script(f'{render_function}({json.dumps(selected_key)})')}
+                {_initial_render_script(f"{render_function}({json.dumps(selected_key)})")}
             }}
             {_loader_script(dependencies, load_callback_name)}
         }})();
@@ -781,7 +781,7 @@ def build_nested_dropdown_plot_response(
                     activeChart.resize();
                 }}
                 window.addEventListener('resize', function() {{ if (chart) {{ chart.resize(); }} }});
-                {_initial_render_script(f'{render_function}({json.dumps(selected_primary_key)}, {json.dumps(selected_secondary_key)})')}
+                {_initial_render_script(f"{render_function}({json.dumps(selected_primary_key)}, {json.dumps(selected_secondary_key)})")}
             }}
             {_loader_script(dependencies, load_callback_name)}
         }})();

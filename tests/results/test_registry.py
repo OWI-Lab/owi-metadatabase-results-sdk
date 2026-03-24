@@ -38,7 +38,7 @@ def test_register_analysis_decorator() -> None:
     class DummyAnalysis:
         analysis_name = "DummyAnalysis"
 
-    registry.register(DummyAnalysis)  # type: ignore[arg-type]
+    registry.register(DummyAnalysis)
     assert "DummyAnalysis" in registry.names()
     instance = registry.get("DummyAnalysis")
     assert instance.analysis_name == "DummyAnalysis"

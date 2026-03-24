@@ -13,9 +13,8 @@ def summarize_payload(payload: Any) -> str:
         return f"items={len(payload)}"
     return type(payload).__name__
 
-def load_token_from_env_file(
-    env_file: Path, env_var: str="OWI_METADATABASE_API_TOKEN"
-) -> str | None:
+
+def load_token_from_env_file(env_file: Path, env_var: str = "OWI_METADATABASE_API_TOKEN") -> str | None:
     if not env_file.exists():
         return None
     for line in env_file.read_text(encoding="utf-8").splitlines():

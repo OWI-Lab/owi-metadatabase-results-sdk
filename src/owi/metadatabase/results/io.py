@@ -23,7 +23,6 @@ from owi.metadatabase._utils.exceptions import (  # ty: ignore[unresolved-import
     InvalidParameterError,
 )
 from owi.metadatabase.io import API  # ty: ignore[unresolved-import]
-from tqdm import tqdm
 
 from .endpoints import DEFAULT_RESULTS_ENDPOINTS, ResultsEndpoints
 

@@ -30,6 +30,7 @@ def colorize(message, color=Color.OKGREEN, underline=False, bold=False):
         Whether to underline the message
     bold : bool
         Whether to make the message bold
+
     Returns
     -------
     str

@@ -16,7 +16,7 @@ class OperatingSystem(Enum):
 
 
 def get_current_system():
-    """Returns the current operating system."""
+    """Return the current operating system."""
     system = platform.system()  # pylint: disable=W0621
 
     if system == "Linux":
