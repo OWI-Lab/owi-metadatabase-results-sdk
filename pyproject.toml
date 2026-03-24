@@ -30,6 +30,7 @@ dependencies = [
     "pydantic>=2.11.0",
     "pyecharts>=2.0.8",
     "requests>=2.32.0",
+    "tqdm >=4.66.0",
 ]
 
 [project.optional-dependencies]
@@ -151,7 +152,7 @@ url = "https://test.pypi.org/simple"
 explicit = true
 
 [tool.deptry.per_rule_ignores]
-DEP002 = ["pyproj", "tqdm", "scipy", "sklearn"]
+DEP002 = ["pyproj", "tqdm", "scipy", "sklearn", "openpyxl", "rich"]
 DEP003 = ["owi"]
 DEP004 = ["invoke", "owi"]
 

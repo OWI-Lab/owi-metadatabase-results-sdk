@@ -1468,6 +1468,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyecharts" },
     { name = "requests" },
+    { name = "tqdm" },
 ]
 
 [package.optional-dependencies]
@@ -1545,6 +1546,7 @@ requires-dist = [
     { name = "pyecharts", specifier = ">=2.0.8" },
     { name = "requests", specifier = ">=2.32.0" },
     { name = "rich", marker = "extra == 'scripts'", specifier = ">=14.1.0" },
+    { name = "tqdm", specifier = ">=4.66.0" },
 ]
 provides-extras = ["scripts"]
 
