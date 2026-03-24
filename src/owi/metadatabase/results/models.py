@@ -30,12 +30,29 @@ class AnalysisDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    source_type: str
+    model_definition_id: int
+    location_id: int | None = None
+    source_type: str | None = None
     source: str | None = None
     description: str | None = None
     user: str | None = None
     timestamp: datetime | None = None
     additional_data: dict[str, Any] = Field(default_factory=dict)
+
+    def to_payload(self) -> dict[str, Any]:
+        """Serialize this definition to the fixed Django schema."""
+        payload: dict[str, Any] = {
+            "name": self.name,
+            "model_definition_id": self.model_definition_id,
+            "location_id": self.location_id,
+            "source_type": self.source_type,
+            "source": self.source,
+            "description": self.description,
+            "user": self.user,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "additional_data": self.additional_data,
+        }
+        return payload
 
 
 class ResultVector(BaseModel):
@@ -126,7 +143,9 @@ class AnalysisRecordPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    source_type: str
+    model_definition_id: int
+    location_id: int | None = None
+    source_type: str | None = None
     source: str | None = None
     description: str | None = None
     user: str | None = None
@@ -193,8 +212,8 @@ class ResultQuery(BaseModel):
         """Translate friendly query fields to backend filters."""
         filters = dict(self.backend_filters)
         if self.analysis_id is not None:
-            filters["analysis"] = self.analysis_id
-        if self.analysis_name is not None:
+            filters["analysis__id"] = self.analysis_id
+        elif self.analysis_name is not None:
             filters["analysis__name"] = self.analysis_name
         if self.site_id is not None:
             filters["site"] = self.site_id

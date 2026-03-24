@@ -16,6 +16,7 @@ from .models import (
     ResultRecordPayload,
     ResultScope,
     ResultSeries,
+    ResultVector,
 )
 
 
@@ -54,6 +55,8 @@ class DjangoAnalysisSerializer:
         """Serialize a validated analysis definition."""
         payload = AnalysisRecordPayload(
             name=obj.name,
+            model_definition_id=obj.model_definition_id,
+            location_id=obj.location_id,
             source_type=obj.source_type,
             source=obj.source,
             description=obj.description,
@@ -67,7 +70,9 @@ class DjangoAnalysisSerializer:
         additional_data = _optional_mapping(mapping.get("additional_data") or mapping.get("data_additional"))
         return AnalysisDefinition(
             name=str(mapping["name"]),
-            source_type=str(mapping["source_type"]),
+            model_definition_id=int(mapping["model_definition_id"]),
+            location_id=_optional_int(mapping.get("location_id")),
+            source_type=_optional_str(mapping.get("source_type")),
             source=_optional_str(mapping.get("source")),
             description=_optional_str(mapping.get("description")),
             user=_optional_str(mapping.get("user")),
@@ -86,26 +91,26 @@ class DjangoResultSerializer:
 
     def from_mapping(self, mapping: Mapping[str, Any]) -> ResultSeries:
         """Deserialize a backend result row."""
-        vectors: list[dict[str, Any]] = [
-            {
-                "name": str(mapping["name_col1"]),
-                "unit": str(mapping["units_col1"]),
-                "values": [float(value) for value in mapping["value_col1"]],
-            },
-            {
-                "name": str(mapping["name_col2"]),
-                "unit": str(mapping["units_col2"]),
-                "values": [float(value) for value in mapping["value_col2"]],
-            },
+        vectors: list[ResultVector] = [
+            ResultVector(
+                name=str(mapping["name_col1"]),
+                unit=str(mapping["units_col1"]),
+                values=[float(value) for value in mapping["value_col1"]],
+            ),
+            ResultVector(
+                name=str(mapping["name_col2"]),
+                unit=str(mapping["units_col2"]),
+                values=[float(value) for value in mapping["value_col2"]],
+            ),
         ]
         value_col3 = mapping.get("value_col3")
         if value_col3 not in (None, []):
             vectors.append(
-                {
-                    "name": str(mapping["name_col3"]),
-                    "unit": str(mapping["units_col3"]),
-                    "values": [float(value) for value in value_col3],
-                }
+                ResultVector(
+                    name=str(mapping["name_col3"]),
+                    unit=str(mapping["units_col3"]),
+                    values=[float(value) for value in value_col3],
+                )
             )
         data_additional = _optional_mapping(mapping.get("additional_data") or mapping.get("data_additional"))
         return ResultSeries(

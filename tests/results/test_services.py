@@ -10,7 +10,10 @@ import pandas as pd
 
 from owi.metadatabase.results import LifetimeDesignFrequencies, ResultsService, WindSpeedHistogram
 from owi.metadatabase.results.analyses.lifetime_design_verification import LifetimeDesignVerification
+from owi.metadatabase.results.models import ResultQuery
 from owi.metadatabase.results.serializers import DjangoResultSerializer
+from owi.metadatabase.results.services import get_results as module_get_results
+from owi.metadatabase.results.services import plot_results as module_plot_results
 
 
 class StubRepository:
@@ -435,3 +438,154 @@ def test_django_result_serializer_reads_json_data_additional() -> None:
 
     reconstructed = LifetimeDesignFrequencies().from_results([result])
     assert list(reconstructed["reference"]) == ["INFL", "ACTU"]
+
+
+class TestCoerceQuery:
+    """Tests for ResultsService._coerce_query."""
+
+    def test_dict_filters_become_query(self) -> None:
+        service = ResultsService(repository=StubRepository(pd.DataFrame()))
+        query = service._coerce_query("WindSpeedHistogram", {"analysis_id": 5})
+        assert isinstance(query, ResultQuery)
+        assert query.analysis_name == "WindSpeedHistogram"
+        assert query.analysis_id == 5
+
+    def test_none_filters_become_default_query(self) -> None:
+        service = ResultsService(repository=StubRepository(pd.DataFrame()))
+        query = service._coerce_query("WindSpeedHistogram")
+        assert query.analysis_name == "WindSpeedHistogram"
+
+    def test_query_object_passthrough(self) -> None:
+        service = ResultsService(repository=StubRepository(pd.DataFrame()))
+        original = ResultQuery(analysis_name="WindSpeedHistogram", analysis_id=7)
+        query = service._coerce_query("WindSpeedHistogram", original)
+        assert query is original
+
+    def test_query_without_name_gets_filled(self) -> None:
+        service = ResultsService(repository=StubRepository(pd.DataFrame()))
+        original = ResultQuery(analysis_id=7)
+        query = service._coerce_query("WindSpeedHistogram", original)
+        assert query.analysis_name == "WindSpeedHistogram"
+        assert query is not original  # model_copy creates a new object
+
+
+class TestDeserializeResultSeriesFromList:
+    def test_list_of_dicts(self) -> None:
+        service = ResultsService(repository=StubRepository(pd.DataFrame()))
+        records = [
+            {
+                "analysis": 99,
+                "site": 1,
+                "location": None,
+                "name_col1": "bin_left",
+                "units_col1": "m/s",
+                "value_col1": [0.0],
+                "name_col2": "value",
+                "units_col2": "-",
+                "value_col2": [1.0],
+                "name_col3": "bin_right",
+                "units_col3": "m/s",
+                "value_col3": [1.0],
+                "short_description": "Design",
+                "description": None,
+                "data_additional": {"analysis_kind": "histogram", "result_scope": "site"},
+            }
+        ]
+        result = service.deserialize_result_series(records)
+        assert len(result) == 1
+        assert result[0].short_description == "Design"
+
+
+class TestGetLocationFrameEdgeCases:
+    def test_repository_without_get_location_frame_returns_empty(self) -> None:
+        """Repository with no get_location_frame attribute returns empty schema."""
+        service = ResultsService(repository=StubRepository(pd.DataFrame()))
+        frame = service.get_location_frame([9])
+        assert frame.empty
+        assert list(frame.columns) == ["id", "title", "northing", "easting"]
+
+    def test_get_location_frame_returns_non_dataframe(self) -> None:
+        """If get_location_frame returns non-DataFrame, service returns empty schema."""
+
+        class BadLocationRepo(StubRepository):
+            def get_location_frame(self, location_ids: list[int]) -> str:  # type: ignore[override]
+                return "not a frame"
+
+        service = ResultsService(repository=BadLocationRepo(pd.DataFrame()))
+        frame = service.get_location_frame([9])
+        assert frame.empty
+
+    def test_get_location_frame_returns_empty_frame(self) -> None:
+        service = ResultsService(
+            repository=StubLocationRepository(
+                pd.DataFrame(),
+                pd.DataFrame(columns=["id", "title", "northing", "easting"]),
+            )
+        )
+        frame = service.get_location_frame([999])
+        assert frame.empty
+
+
+class TestPlotContext:
+    def test_non_geo_returns_empty(self) -> None:
+        service = ResultsService(repository=StubRepository(pd.DataFrame()))
+        ctx = service._plot_context([], plot_type="comparison")
+        assert ctx == {}
+
+    def test_none_plot_type_returns_empty(self) -> None:
+        service = ResultsService(repository=StubRepository(pd.DataFrame()))
+        ctx = service._plot_context([], plot_type=None)
+        assert ctx == {}
+
+    def test_geo_adds_location_frame(self) -> None:
+        from owi.metadatabase.results.models import AnalysisKind, ResultScope, ResultSeries, ResultVector
+
+        record = ResultSeries(
+            analysis_name="test",
+            analysis_kind=AnalysisKind.COMPARISON,
+            result_scope=ResultScope.LOCATION,
+            short_description="...",
+            location_id=9,
+            vectors=[
+                ResultVector(name="x", unit="u", values=[1.0]),
+                ResultVector(name="y", unit="v", values=[2.0]),
+            ],
+        )
+        location_frame = pd.DataFrame([{"id": 9, "title": "BBA01", "northing": 51, "easting": 2}])
+        service = ResultsService(
+            repository=StubLocationRepository(pd.DataFrame(), location_frame),
+        )
+        ctx = service._plot_context([record], plot_type="geo")
+        assert "location_frame" in ctx
+        assert len(ctx["location_frame"]) == 1
+
+
+class TestModuleLevelFunctions:
+    def _make_stub_service(self) -> ResultsService:
+        """Build a service backed by a stub with one histogram result."""
+        analysis = WindSpeedHistogram()
+        results = analysis.to_results(
+            {
+                "series": [
+                    {
+                        "title": "Design",
+                        "scope_label": "Site",
+                        "site_id": 1,
+                        "bins": [(0.0, 1.0), (1.0, 2.0)],
+                        "values": [1.0, 2.0],
+                    }
+                ]
+            }
+        )
+        frame = pd.DataFrame([r.to_record_payload(analysis_id=11) for r in results])
+        return ResultsService(repository=StubRepository(frame))
+
+    def test_module_get_results(self) -> None:
+        service = self._make_stub_service()
+        df = module_get_results("WindSpeedHistogram", service=service)
+        assert "bin_left" in df.columns
+
+    def test_module_plot_results(self) -> None:
+        service = self._make_stub_service()
+        response = module_plot_results("WindSpeedHistogram", service=service)
+        assert response.html

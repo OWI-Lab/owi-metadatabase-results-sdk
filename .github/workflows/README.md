@@ -12,8 +12,8 @@ flowchart TD
     AutoMerge -->|merge release PR| Tag[Create git tag]
     Tag -->|dispatch publish workflow on tag ref| Publish[publish.yml]
     Publish --> Docs[docs.yml]
-    Docs --> GhPages[gh-pages branch]
-    GhPages --> Pages[GitHub Pages publication]
+    Docs --> Artifact[GitHub Pages artifact]
+    Artifact --> Pages[GitHub Pages publication]
     ManualDocs[Manual docs dispatch] --> Docs
     ManualPublish[Manual publish dispatch] --> Publish
 ```
@@ -24,7 +24,7 @@ Workflow roles:
 - `release-preview.yml`: Shows the next semantic version implied by the PR labels.
 - `release-on-merge.yml`: Creates the version-bump release PR after a normal PR merge, enables auto-merge for that release PR, and tags/releases when the release PR merges. After tagging a release, it dispatches `publish.yml` as a fresh workflow run on the release tag.
 - `publish.yml`: Publishes the package to PyPI from a direct `workflow_dispatch` run and then triggers documentation deployment after both release-driven and manual publishes.
-- `docs.yml`: Builds the documentation and publishes it to the `gh-pages` branch, either manually or when called by `publish.yml`.
+- `docs.yml`: Builds the documentation with Zensical and deploys it through the GitHub Pages artifact workflow, either manually or when called by `publish.yml`.
 
 Workflow status table:
 
@@ -38,7 +38,7 @@ Workflow status table:
 
 Expected repository setting:
 
-- GitHub Pages should be configured to publish from the `gh-pages` branch.
+- GitHub Pages should be configured to publish from GitHub Actions.
 - Auto-merge should be enabled for the repository to allow the release PRs to merge automatically when checks pass.
 - The `main` branch should be protected to require pull requests before merging, ensuring that all changes are reviewed and validated by CI before becoming part of a release.
 - The `publish.yml` workflow should be allowed to interact with PyPI either via repo secrets for authentication or via GitHub's OIDC integration for secure token exchange.

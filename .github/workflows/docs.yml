@@ -69,16 +69,19 @@ on:
         default: true
 
 concurrency:
-  group: docs-${{ inputs.docs_version || github.ref }}
+  group: docs-${{ inputs.target_ref || github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/configure-pages@v5
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.target_ref || github.event.inputs.target_ref || github.ref_name }}
@@ -94,10 +97,6 @@ jobs:
           enable-cache: true
       - name: Install dependencies
         run: uv sync --dev
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
       - name: Resolve docs publication arguments
         id: docs_args
         env:
@@ -114,16 +113,15 @@ jobs:
           echo "version=${INPUT_DOCS_VERSION#v}" >> "$GITHUB_OUTPUT"
           echo "alias=${INPUT_DOCS_ALIAS#v}" >> "$GITHUB_OUTPUT"
           echo "set_default=${INPUT_SET_DEFAULT}" >> "$GITHUB_OUTPUT"
-      - name: Deploy versioned docs with mike
-        run: |
-          uv run invoke docs.deploy-version \
-            --version "${{ steps.docs_args.outputs.version }}" \
-            --alias "${{ steps.docs_args.outputs.alias }}"
-      - name: Set default docs version
-        if: ${{ steps.docs_args.outputs.set_default == 'true' }}
-        run: |
-          uv run invoke docs.set-default-version \
-            --version "${{ steps.docs_args.outputs.version }}"
+      - name: Build docs with Zensical
+        run: uv run zensical build --clean
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - name: Deploy Pages site
+        id: deployment
+        uses: actions/deploy-pages@v4
       - name: Summarize docs publish
         run: |
           {
@@ -132,7 +130,7 @@ jobs:
             echo "- Source ref: ${{ steps.docs_args.outputs.target_ref }}"
             echo "- Publish mode: ${{ steps.docs_args.outputs.publish_mode }}"
             echo "- Publish confirmed: ${{ steps.docs_args.outputs.confirm_publish }}"
-            echo "- Docs version: ${{ steps.docs_args.outputs.version }}"
-            echo "- Docs alias: ${{ steps.docs_args.outputs.alias }}"
-            echo "- Default version updated: ${{ steps.docs_args.outputs.set_default }}"
+            echo "- Requested docs label: ${{ steps.docs_args.outputs.version }}"
+            echo "- Requested docs alias: ${{ steps.docs_args.outputs.alias }}"
+            echo "- Deployment mode: GitHub Pages artifact via Zensical"
           } >> "$GITHUB_STEP_SUMMARY"

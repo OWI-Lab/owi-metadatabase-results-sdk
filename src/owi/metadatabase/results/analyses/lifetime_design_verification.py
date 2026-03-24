@@ -9,7 +9,8 @@ from typing import Any
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ..models import AnalysisKind, ResultScope, ResultSeries, ResultVector
+from ..models import AnalysisKind, PlotRequest, PlotResponse, ResultScope, ResultSeries, ResultVector
+from ..plotting.verification import plot_verification_comparison, plot_verification_time_series
 from ..registry import register_analysis
 from .base import BaseAnalysis
 
@@ -133,3 +134,21 @@ class LifetimeDesignVerification(BaseAnalysis):
                     }
                 )
         return pd.DataFrame(rows)
+
+    def plot(
+        self,
+        results: Sequence[ResultSeries],
+        request: PlotRequest | None = None,
+        plot_strategy: Any | None = None,
+    ) -> PlotResponse:
+        """Render verification results using the requested plot type."""
+        del plot_strategy
+        plot_request = request or PlotRequest(analysis_name=self.analysis_name)
+        plot_type = plot_request.plot_type or self.default_plot_type
+        data = self.from_results(results)
+
+        if plot_type == "time_series":
+            return plot_verification_time_series(data)
+        if plot_type == "comparison":
+            return plot_verification_comparison(data)
+        raise ValueError(f"Unsupported plot_type for {self.analysis_name}: {plot_type}")

@@ -8,7 +8,7 @@ Results extension for OWI Metadatabase SDK
 [![pytest](https://img.shields.io/github/actions/workflow/status/owi-lab/owi-metadatabase-results-sdk/ci.yml?label=pytest)](https://github.com/OWI-Lab/owi-metadatabase-results-sdk/actions/workflows/ci.yml)
 [![lint](https://img.shields.io/github/actions/workflow/status/owi-lab/owi-metadatabase-results-sdk/ci.yml?label=lint)](https://github.com/OWI-Lab/owi-metadatabase-results-sdk/actions/workflows/ci.yml)
 [![issues](https://img.shields.io/github/issues/owi-lab/owi-metadatabase-results-sdk)](https://github.com/OWI-Lab/owi-metadatabase-results-sdk/issues)
-[![Documentation](https://img.shields.io/badge/docs-mkdocs-blue)](https://owi-lab.github.io/owi-metadatabase-results-sdk/)
+[![Documentation](https://img.shields.io/badge/docs-zensical-blue)](https://owi-lab.github.io/owi-metadatabase-results-sdk/)
 
 ## Overview
 
@@ -177,36 +177,6 @@ Interpretation:
 - `PROJECTSITE` and `ASSETLOCATION` come from the locations package and provide the site and asset identifiers used by result queries.
 - `northing` and `easting` on `ASSETLOCATION` are what make geo-oriented result plots possible.
 - Geometry objects like `OWT` and `SUBASSEMBLY` are not owned by the results package, but they are the physical context users typically join onto result rows through location/site relationships.
-
-## Terminal Scripts
-
-The package now ships with two terminal-oriented scripts under [scripts](scripts):
-
-1. [scripts/notebook_results_demo.py](scripts/notebook_results_demo.py)
-  Reimplements the legacy upload notebook as a terminal workflow using `rich`.
-2. [scripts/upload_results_example_data.py](scripts/upload_results_example_data.py)
-  Reads the workbook in [scripts/data/results-example-data.xlsx](scripts/data/results-example-data.xlsx) and prepares or uploads the three example result sheets.
-
-Both scripts use the `OWI_METADATABASE_API_TOKEN` environment variable for authenticated uploads.
-
-Dry-run execution:
-
-```bash
-uv run python scripts/notebook_results_demo.py
-uv run python scripts/upload_results_example_data.py
-```
-
-Authenticated execution:
-
-```bash
-source ~/.zshrc
-env OWI_METADATABASE_API_TOKEN="$OWI_METADATABASE_API_TOKEN" uv run python scripts/notebook_results_demo.py --upload
-env OWI_METADATABASE_API_TOKEN="$OWI_METADATABASE_API_TOKEN" uv run python scripts/upload_results_example_data.py --upload
-```
-
-The explicit `env ...` prefix is useful in shells where `uv run` does not automatically inherit the token.
-When the backend does not expose the bulk results endpoint, the workbook uploader automatically falls back to single-result POST requests.
-Rows that cannot be mapped to a backend `location` are reported and skipped during live workbook uploads because the current dev backend requires `location` on result creation.
 
 ## Development
 

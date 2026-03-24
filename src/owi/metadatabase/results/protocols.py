@@ -112,6 +112,9 @@ class ResultsRepositoryProtocol(Protocol):
     def update_result(self, result_id: int, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         """Patch a single result record."""
 
+    def get_location_frame(self, location_ids: Sequence[int]) -> pd.DataFrame:
+        """Return location metadata required by geo-oriented workflows."""
+
 
 @runtime_checkable
 class QueryServiceProtocol(Protocol):

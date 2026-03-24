@@ -1,12 +1,14 @@
 """Results extension for OWI Metadatabase SDK."""
 
-from .analyses import BaseAnalysis, LifetimeDesignFrequencies, LifetimeDesignVerification, WindSpeedHistogram
-from .ceit import CeitMeasurement, CeitResultsService, load_ceit_measurements, plot_ceit_analyses
-from .endpoints import DEFAULT_RESULTS_ENDPOINTS, ResultsEndpoints
-from .frequency_plots import (
-    plot_lifetime_design_frequencies_by_location,
-    plot_lifetime_design_frequencies_geo,
+from .analyses import (
+    BaseAnalysis,
+    CeitMeasurement,
+    LifetimeDesignFrequencies,
+    LifetimeDesignVerification,
+    WindSpeedHistogram,
+    load_ceit_measurements,
 )
+from .endpoints import DEFAULT_RESULTS_ENDPOINTS, ResultsEndpoints
 from .io import ResultsAPI
 from .models import (
     AnalysisDefinition,
@@ -20,9 +22,14 @@ from .models import (
     ResultVector,
 )
 from .plotting import HistogramPlotStrategy, TimeSeriesPlotStrategy
+from .plotting.ceit import plot_ceit_analyses
+from .plotting.frequency import (
+    plot_lifetime_design_frequencies_by_location,
+    plot_lifetime_design_frequencies_geo,
+)
 from .protocols import AnalysisProtocol, PlotStrategyProtocol, ResultProtocol
 from .registry import AnalysisRegistry, default_registry, register_analysis
-from .services import ResultsService, get_results, plot_results
+from .services import CeitResultsService, ResultsService, get_results, plot_results
 
 __version__ = "0.1.0"
 

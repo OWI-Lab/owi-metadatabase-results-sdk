@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 
 from ..models import PlotRequest, PlotResponse, ResultSeries
-from ..plotting import get_plot_strategy
+from ..plotting.strategies import get_plot_strategy
 from ..protocols import PlotStrategyProtocol
 
 
@@ -47,3 +47,10 @@ class BaseAnalysis:
         strategy = plot_strategy or get_plot_strategy(plot_request.plot_type or self.default_plot_type)
         data = self.from_results(results)
         return strategy.render(data, plot_request)
+
+    def __repr__(self) -> str:
+        return f"""{self.__class__.__name__}(\n
+            analysis_name={self.analysis_name!r},
+            analysis_kind={self.analysis_kind!r},
+            result_scope={self.result_scope!r},
+            default_plot_type={self.default_plot_type!r}\n)"""
