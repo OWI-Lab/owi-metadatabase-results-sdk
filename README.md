@@ -12,8 +12,7 @@ Results extension for OWI Metadatabase SDK
 
 ## Overview
 
-This package extends `owi-metadatabase` under the `owi.metadatabase.*`
-namespace so it behaves like the existing extension packages.
+This package extends [`owi-metadatabase`](https://pypi.org/project/owi-metadatabase/) under the `owi.metadatabase.*` namespace so it behaves like the existing extension packages.
 
 ## Installation
 
@@ -182,7 +181,7 @@ Interpretation:
 
 ```bash
 uv sync --dev
-uv run invoke test.run
-uv run invoke qa.all
+uv run invoke test
+uv run invoke qa
 uv run invoke docs.build
 ```
