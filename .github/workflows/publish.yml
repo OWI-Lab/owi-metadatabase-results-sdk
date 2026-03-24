@@ -96,6 +96,8 @@ jobs:
     needs: [publish]
     permissions:
       contents: write
+      pages: write
+      id-token: write
     uses: ./.github/workflows/docs.yml
     with:
       target_ref: ${{ inputs.target_ref || github.ref_name || 'main' }}
