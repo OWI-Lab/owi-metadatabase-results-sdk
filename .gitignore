@@ -40,3 +40,8 @@ site/  # Documentation build output
 .DS_Store
 
 .vscode/
+
+
+# Data
+data/
+**/data/

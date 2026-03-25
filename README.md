@@ -12,7 +12,9 @@ Results extension for OWI Metadatabase SDK
 
 ## Overview
 
-This package extends [`owi-metadatabase`](https://pypi.org/project/owi-metadatabase/) under the `owi.metadatabase.*` namespace so it behaves like the existing extension packages.
+This package extends [`owi-metadatabase`](https://pypi.org/project/owi-metadatabase/) SDK under the `owi.metadatabase.*` namespace so it behaves like the existing extension packages.
+
+📚 **[Read the Documentation](https://owi-lab.github.io/owi-metadatabase-results-sdk/)**
 
 ## Installation
 
