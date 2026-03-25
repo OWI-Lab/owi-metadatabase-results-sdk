@@ -41,7 +41,7 @@ site/  # Documentation build output
 
 .vscode/
 
-
 # Data
 data/
 **/data/
+!**/data/.gitkeep

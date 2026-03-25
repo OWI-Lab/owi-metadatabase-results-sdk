@@ -23,7 +23,7 @@ uv run invoke test.all
 ## Quality Gate
 
 ```bash
-uv run invoke qa.all
+uv run invoke qa
 ```
 
 This runs `ruff format`, `ruff check`, and `ty check`.

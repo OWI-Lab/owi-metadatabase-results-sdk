@@ -21,7 +21,7 @@ If no release label is present, the workflow defaults to a **patch** release.
   previews the target version.
 - **Release On Merge** — runs after merge, executes
   `uv sync --dev --locked`, `uv run invoke test.run`,
-  `uv run invoke qa.all`, and `uv run invoke docs.build` before tagging.
+  `uv run invoke qa`, and `uv run invoke docs.build` before tagging.
 - **Tag push** (`v*`) — deploys docs, publishes to PyPI, creates a GitHub
   release.
 
