@@ -7,7 +7,7 @@ authors = [
 ]
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.9,<3.15"
 
 keywords = ["owimetadatabase", "extension", "results"]
 
@@ -15,6 +15,7 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -23,14 +24,14 @@ classifiers = [
 ]
 
 dependencies = [
-    "ipython>=8.0.0",
-    "ipywidgets>=8.1.0",
-    "owi-metadatabase>=0.1.2",
-    "pandas>=2.2.0",
-    "pydantic>=2.11.0",
-    "pyecharts>=2.0.8",
-    "requests>=2.32.0",
-    "tqdm >=4.66.0",
+    "ipython >= 8.0.0",
+    "ipywidgets >= 8.1.0",
+    "owi-metadatabase >= 0.1.2",
+    "pandas >= 2.2.0",
+    "pydantic >= 2.11.0",
+    "pyecharts >= 2.0.8",
+    "requests >= 2.32.0",
+    "tqdm >= 4.66.0",
 ]
 
 [project.optional-dependencies]
@@ -71,7 +72,7 @@ scripts = [
     "rich>=14.1.0",
 ]
 docs = [
-    "zensical >=0.0.28",
+    "zensical >=0.0.28 ; python_version >= '3.10'",
     "mkdocstrings-python >=1.0.0",
     "pymdown-extensions >=10.0",
 ]

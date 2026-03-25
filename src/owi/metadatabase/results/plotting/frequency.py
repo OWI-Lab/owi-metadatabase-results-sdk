@@ -66,12 +66,13 @@ def plot_lifetime_design_frequencies_comparison(
         x_values = list(dict.fromkeys(metric_frame["reference"].astype(str).tolist()))
         chart.add_xaxis(x_values)
         for location_title, location_frame_group in metric_frame.groupby("location_title"):
-            values_by_reference = dict(
-                zip(location_frame_group["reference"].astype(str), location_frame_group["y"], strict=False)
-            )
+            values_by_reference = {
+                str(reference): value
+                for reference, value in location_frame_group[["reference", "y"]].itertuples(index=False, name=None)
+            }
             chart.add_yaxis(
                 str(location_title),
-                cast(Any, [values_by_reference.get(reference) for reference in x_values]),
+                cast(Any, [values_by_reference.get(str(reference)) for reference in x_values]),
                 symbol_size=12,
             )
         chart.set_series_opts(label_opts=_label_opts(is_show=False))
@@ -102,12 +103,13 @@ def plot_lifetime_design_frequencies_by_location(
         x_values = list(dict.fromkeys(metric_frame["location_title"].astype(str).tolist()))
         chart.add_xaxis(x_values)
         for reference, reference_frame in metric_frame.groupby("reference"):
-            values_by_location = dict(
-                zip(reference_frame["location_title"].astype(str), reference_frame["y"], strict=False)
-            )
+            values_by_location = {
+                str(location): value
+                for location, value in reference_frame[["location_title", "y"]].itertuples(index=False, name=None)
+            }
             chart.add_yaxis(
                 str(reference),
-                cast(Any, [values_by_location.get(location) for location in x_values]),
+                cast(Any, [values_by_location.get(str(location)) for location in x_values]),
                 symbol_size=12,
             )
         chart.set_series_opts(label_opts=_label_opts(is_show=False))

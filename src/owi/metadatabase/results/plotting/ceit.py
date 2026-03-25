@@ -34,7 +34,10 @@ def plot_ceit_analyses(data: pd.DataFrame | Sequence[Any]) -> Any:
         x_values = list(dict.fromkeys(sensor_frame["timestamp"].astype(str).tolist()))
         chart.add_xaxis(x_values)
         for metric, metric_frame in sensor_frame.groupby("metric"):
-            values_by_timestamp = dict(zip(metric_frame["timestamp"].astype(str), metric_frame["value"], strict=False))
+            values_by_timestamp = {
+                str(timestamp): value
+                for timestamp, value in metric_frame[["timestamp", "value"]].itertuples(index=False, name=None)
+            }
             chart.add_yaxis(
                 str(metric),
                 cast(Any, [values_by_timestamp.get(timestamp) for timestamp in x_values]),

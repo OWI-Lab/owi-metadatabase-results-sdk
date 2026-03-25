@@ -106,9 +106,15 @@ class CeitResultsService:
         return int(created["id"]), True
 
     def _merge_result_series(self, existing: ResultSeries, incoming: ResultSeries) -> tuple[ResultSeries, int]:
-        existing_points = dict(zip(existing.vectors[0].values, existing.vectors[1].values, strict=False))
+        existing_points = {
+            existing.vectors[0].values[index]: existing.vectors[1].values[index]
+            for index in range(min(len(existing.vectors[0].values), len(existing.vectors[1].values)))
+        }
         appended_points = 0
-        for timestamp, value in zip(incoming.vectors[0].values, incoming.vectors[1].values, strict=False):
+        incoming_point_count = min(len(incoming.vectors[0].values), len(incoming.vectors[1].values))
+        for index in range(incoming_point_count):
+            timestamp = incoming.vectors[0].values[index]
+            value = incoming.vectors[1].values[index]
             if timestamp not in existing_points:
                 appended_points += 1
             existing_points[timestamp] = value
@@ -205,7 +211,10 @@ class CeitResultsService:
                 series.data_additional.get("sensor_identifier", series.analysis_name.split(":")[-1])
             )
             metric = str(series.data_additional.get("metric", series.short_description))
-            for timestamp, value in zip(series.vectors[0].values, series.vectors[1].values, strict=False):
+            point_count = min(len(series.vectors[0].values), len(series.vectors[1].values))
+            for index in range(point_count):
+                timestamp = series.vectors[0].values[index]
+                value = series.vectors[1].values[index]
                 rows.append(
                     {
                         "sensor_identifier": sensor_identifier,

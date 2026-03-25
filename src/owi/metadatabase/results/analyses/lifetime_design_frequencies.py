@@ -165,7 +165,10 @@ class LifetimeDesignFrequencies(BaseAnalysis):
             y_values = result.vectors[1].values
             labels = self._reference_labels_from_result(result)
             turbine, metric = self._split_series_description(result.short_description)
-            for index, (x_value, y_value) in enumerate(zip(x_values, y_values, strict=False)):
+            point_count = min(len(x_values), len(y_values))
+            for index in range(point_count):
+                x_value = x_values[index]
+                y_value = y_values[index]
                 label = labels[index] if index < len(labels) else str(x_value)
                 rows.append(
                     {

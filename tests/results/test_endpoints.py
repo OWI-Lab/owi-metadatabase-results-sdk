@@ -32,7 +32,7 @@ def test_detail_path_strips_trailing_slash_before_id() -> None:
 def test_frozen_dataclass_prevents_mutation() -> None:
     endpoints = ResultsEndpoints()
     with pytest.raises(AttributeError):
-        endpoints.api_subdir = "/other/"  # type: ignore[misc]
+        object.__setattr__(endpoints, "api_subdir", "/other/")
 
 
 def test_custom_endpoints() -> None:

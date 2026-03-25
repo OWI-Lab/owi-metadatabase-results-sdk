@@ -49,7 +49,8 @@ class StubLocationRepository(StubRepository):
         self.location_frame = location_frame
 
     def get_location_frame(self, location_ids: list[int]) -> pd.DataFrame:
-        return self.location_frame[self.location_frame["id"].isin(location_ids)].copy()
+        result = self.location_frame[self.location_frame["id"].isin(location_ids)].copy()
+        return pd.DataFrame(result)
 
 
 @pytest.fixture()

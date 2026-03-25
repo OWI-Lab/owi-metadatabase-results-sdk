@@ -39,7 +39,7 @@ class HistogramPlotStrategy:
         labels = list(dict.fromkeys(frame["bin_label"].tolist()))
         chart.add_xaxis(labels)
         for series_name, group in frame.groupby("series_name"):
-            values_by_label = dict(zip(group["bin_label"], group["value"], strict=False))
+            values_by_label = dict(group[["bin_label", "value"]].itertuples(index=False, name=None))
             chart.add_yaxis(
                 str(series_name),
                 [float(values_by_label.get(label, 0.0)) for label in labels],
@@ -69,7 +69,9 @@ class TimeSeriesPlotStrategy:
         x_values = list(dict.fromkeys(frame["x"].astype(str).tolist()))
         chart.add_xaxis(x_values)
         for series_name, group in frame.groupby("series_name"):
-            values_by_x = dict(zip(group["x"].astype(str), group["y"], strict=False))
+            values_by_x = {
+                str(x_value): y_value for x_value, y_value in group[["x", "y"]].itertuples(index=False, name=None)
+            }
             chart.add_yaxis(
                 str(series_name),
                 cast(Any, [float(values_by_x.get(value, 0.0)) for value in x_values]),

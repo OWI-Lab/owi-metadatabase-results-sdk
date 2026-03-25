@@ -76,7 +76,7 @@ def stop(c_r):
             return
         tmp_str = colorize("\nStopping coverage server...\n", color=Color.HEADER, bold=True)
         print(tmp_str)
-        _command = f"kill $(lsof -ti:{COV_PORT})"
+        _command = f"if lsof -ti:{COV_PORT} > /dev/null; then kill $(lsof -ti:{COV_PORT}); fi"
         print(f"{colorize('>>> ' + _command, color=Color.OKBLUE)}\n")
         c_r.run(_command)
 

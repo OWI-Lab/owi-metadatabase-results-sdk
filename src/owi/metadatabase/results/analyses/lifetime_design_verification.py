@@ -123,7 +123,10 @@ class LifetimeDesignVerification(BaseAnalysis):
             y_values = result.vectors[1].values
             turbine = result.data_additional.get("turbine", result.short_description)
             metric = result.data_additional.get("metric", result.vectors[1].name.upper())
-            for x_value, y_value in zip(x_values, y_values, strict=False):
+            point_count = min(len(x_values), len(y_values))
+            for index in range(point_count):
+                x_value = x_values[index]
+                y_value = y_values[index]
                 rows.append(
                     {
                         "x": datetime.fromtimestamp(x_value, tz=timezone.utc).isoformat(),

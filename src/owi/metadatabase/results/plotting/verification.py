@@ -35,7 +35,10 @@ def plot_verification_time_series(data: pd.DataFrame) -> Any:
         x_values = list(dict.fromkeys(metric_frame["x"].astype(str).tolist()))
         chart.add_xaxis(x_values)
         for turbine, turbine_frame in metric_frame.groupby("turbine"):
-            values_by_x = dict(zip(turbine_frame["x"].astype(str), turbine_frame["y"], strict=False))
+            values_by_x = {
+                str(x_value): y_value
+                for x_value, y_value in turbine_frame[["x", "y"]].itertuples(index=False, name=None)
+            }
             chart.add_yaxis(
                 str(turbine),
                 cast(Any, [values_by_x.get(value) for value in x_values]),
@@ -71,7 +74,10 @@ def plot_verification_comparison(data: pd.DataFrame) -> Any:
         x_values = list(dict.fromkeys(turbine_frame["x"].astype(str).tolist()))
         chart.add_xaxis(x_values)
         for metric, metric_frame in turbine_frame.groupby("metric"):
-            values_by_x = dict(zip(metric_frame["x"].astype(str), metric_frame["y"], strict=False))
+            values_by_x = {
+                str(x_value): y_value
+                for x_value, y_value in metric_frame[["x", "y"]].itertuples(index=False, name=None)
+            }
             chart.add_yaxis(
                 str(metric),
                 cast(Any, [values_by_x.get(value) for value in x_values]),

@@ -52,7 +52,8 @@ class StubLocationRepository(StubRepository):
         self.location_frame = location_frame
 
     def get_location_frame(self, location_ids: Any) -> pd.DataFrame:
-        return self.location_frame[self.location_frame["id"].isin(location_ids)].copy()
+        result = self.location_frame[self.location_frame["id"].isin(location_ids)].copy()
+        return pd.DataFrame(result)
 
 
 def test_wind_speed_histogram_to_results_and_plot() -> None:

@@ -49,7 +49,7 @@ class TestResultVector:
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError):
-            ResultVector(name="x", unit="m/s", values=[1.0], extra="nope")  # type: ignore[call-arg]
+            ResultVector.model_validate({"name": "x", "unit": "m/s", "values": [1.0], "extra": "nope"})
 
 
 class TestRelatedObject:
@@ -60,7 +60,7 @@ class TestRelatedObject:
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError):
-            RelatedObject(type="turbine", id=42, extra="nope")  # type: ignore[call-arg]
+            RelatedObject.model_validate({"type": "turbine", "id": 42, "extra": "nope"})
 
 
 class TestResultSeries:
@@ -195,7 +195,15 @@ class TestAnalysisDefinition:
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError):
-            AnalysisDefinition(name="Test", model_definition_id=7, location_id=None, source_type="script", extra="no")  # type: ignore[call-arg]
+            AnalysisDefinition.model_validate(
+                {
+                    "name": "Test",
+                    "model_definition_id": 7,
+                    "location_id": None,
+                    "source_type": "script",
+                    "extra": "no",
+                }
+            )
 
 
 class TestResultRecordPayload:
@@ -289,4 +297,4 @@ class TestPlotRequest:
 
     def test_extra_fields_forbidden(self) -> None:
         with pytest.raises(ValidationError):
-            PlotRequest(analysis_name="Test", extra="no")  # type: ignore[call-arg]
+            PlotRequest.model_validate({"analysis_name": "Test", "extra": "no"})

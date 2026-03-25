@@ -65,7 +65,10 @@ class WindSpeedHistogram(BaseAnalysis):
         validated = self.validate_inputs(payload)
         rows: list[dict[str, Any]] = []
         for series in validated.series:
-            for (bin_left, bin_right), value in zip(series.bins, series.values, strict=False):
+            point_count = min(len(series.bins), len(series.values))
+            for index in range(point_count):
+                bin_left, bin_right = series.bins[index]
+                value = series.values[index]
                 rows.append(
                     {
                         "series_name": series.title,
@@ -117,7 +120,11 @@ class WindSpeedHistogram(BaseAnalysis):
             bin_left = result.vectors[0].values
             values = result.vectors[1].values
             bin_right = result.vectors[2].values if len(result.vectors) > 2 else [None] * len(values)
-            for left, value, right in zip(bin_left, values, bin_right, strict=False):
+            point_count = min(len(bin_left), len(values), len(bin_right))
+            for index in range(point_count):
+                left = bin_left[index]
+                value = values[index]
+                right = bin_right[index]
                 rows.append(
                     {
                         "series_name": result.short_description,
