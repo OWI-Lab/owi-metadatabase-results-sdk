@@ -31,7 +31,7 @@ from .protocols import AnalysisProtocol, PlotStrategyProtocol, ResultProtocol
 from .registry import AnalysisRegistry, default_registry, register_analysis
 from .services import CeitResultsService, ResultsService, get_results, plot_results
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "AnalysisDefinition",
