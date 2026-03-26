@@ -11,6 +11,28 @@ from owi.metadatabase._utils.exceptions import (  # ty: ignore[unresolved-import
 from owi.metadatabase.results import DEFAULT_RESULTS_ENDPOINTS, ResultsAPI
 
 
+class ProgressBarRecorder:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def factory(self, *args: object, **kwargs: object):
+        updates: list[int] = []
+        call: dict[str, object] = {"args": args, "kwargs": kwargs, "updates": updates}
+        self.calls.append(call)
+
+        class _ProgressBar:
+            def __enter__(self_inner):
+                return self_inner
+
+            def __exit__(self_inner, exc_type, exc, tb) -> bool:
+                return False
+
+            def update(self_inner, amount: int) -> None:
+                updates.append(amount)
+
+        return _ProgressBar()
+
+
 def test_ping() -> None:
     api = ResultsAPI(token="dummy")
     assert api.ping() == "ok"
@@ -131,6 +153,31 @@ def test_create_results_bulk_posts_to_bulk_endpoint() -> None:
     assert result["exists"] is True
 
 
+def test_create_results_bulk_uses_batch_progress_bar() -> None:
+    api = ResultsAPI(token="dummy")
+    response = requests.Response()
+    response.status_code = 201
+    response._content = b'[{"id": 1}, {"id": 2}]'
+    response.reason = "Created"
+    payloads = [{"analysis": 1, "name_col1": "x"}, {"analysis": 1, "name_col1": "y"}]
+    progress = ProgressBarRecorder()
+
+    with (
+        patch("owi.metadatabase.results.io.tqdm", new=progress.factory),
+        patch("requests.request", return_value=response),
+    ):
+        api.create_results_bulk(payloads)
+
+    assert len(progress.calls) == 1
+    kwargs = progress.calls[0]["kwargs"]
+    assert kwargs == {
+        "total": 1,
+        "desc": "Uploading result batch",
+        "unit": "request",
+    }
+    assert progress.calls[0]["updates"] == [1]
+
+
 def test_create_results_bulk_falls_back_to_single_posts_when_bulk_is_not_supported() -> None:
     api = ResultsAPI(token="dummy")
 
@@ -159,6 +206,48 @@ def test_create_results_bulk_falls_back_to_single_posts_when_bulk_is_not_support
     assert mocker.call_args_list[2].args[1].endswith(DEFAULT_RESULTS_ENDPOINTS.mutation_path("result"))
     assert result["exists"] is True
     assert list(result["data"]["id"]) == [1, 2]
+
+
+def test_create_results_bulk_fallback_uses_row_progress_bar() -> None:
+    api = ResultsAPI(token="dummy")
+
+    bulk_response = requests.Response()
+    bulk_response.status_code = 405
+    bulk_response.reason = "Method Not Allowed"
+    bulk_response._content = b""
+
+    first_result = requests.Response()
+    first_result.status_code = 201
+    first_result.reason = "Created"
+    first_result._content = b'{"id": 1, "analysis": 10, "name_col1": "x"}'
+
+    second_result = requests.Response()
+    second_result.status_code = 201
+    second_result.reason = "Created"
+    second_result._content = b'{"id": 2, "analysis": 10, "name_col1": "y"}'
+
+    progress = ProgressBarRecorder()
+    payloads = [{"analysis": 10, "name_col1": "x"}, {"analysis": 10, "name_col1": "y"}]
+
+    with (
+        patch("owi.metadatabase.results.io.tqdm", new=progress.factory),
+        patch("requests.request", side_effect=[bulk_response, first_result, second_result]),
+    ):
+        api.create_results_bulk(payloads)
+
+    assert len(progress.calls) == 2
+    assert progress.calls[0]["kwargs"] == {
+        "total": 1,
+        "desc": "Uploading result batch",
+        "unit": "request",
+    }
+    assert progress.calls[0]["updates"] == []
+    assert progress.calls[1]["kwargs"] == {
+        "total": 2,
+        "desc": "Uploading result rows",
+        "unit": "row",
+    }
+    assert progress.calls[1]["updates"] == [1, 1]
 
 
 def test_create_results_bulk_falls_back_on_404() -> None:

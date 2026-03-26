@@ -210,7 +210,8 @@ result_payloads = [
 ## Step 5 — Upload to the Backend
 
 Upload only runs when `ANALYSIS_ID` is `None`. When reusing an existing
-analysis, set `ANALYSIS_ID` to skip straight to retrieval.
+analysis, set `ANALYSIS_ID` to skip straight to retrieval. The bulk upload
+call renders a `tqdm` progress bar automatically.
 
 ```mermaid
 flowchart TD

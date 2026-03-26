@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -22,6 +23,28 @@ from owi.metadatabase.results.analyses.ceit import (
     _sanitize_json_text,
     ceit_frame_from_measurements,
 )
+
+
+class ProgressBarRecorder:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def factory(self, *args: object, **kwargs: object):
+        updates: list[int] = []
+        call: dict[str, object] = {"args": args, "kwargs": kwargs, "updates": updates}
+        self.calls.append(call)
+
+        class _ProgressBar:
+            def __enter__(self_inner):
+                return self_inner
+
+            def __exit__(self_inner, exc_type, exc, tb) -> bool:
+                return False
+
+            def update(self_inner, amount: int) -> None:
+                updates.append(amount)
+
+        return _ProgressBar()
 
 
 class StubCeitApi:
@@ -79,6 +102,58 @@ class StubCeitApi:
         return {"id": result_id, "data": pd.DataFrame([payload])}
 
 
+class SharedAnalysisStubCeitApi(StubCeitApi):
+    """Small API stub used to validate shared-analysis CEIT behavior."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.result_rows = pd.DataFrame(
+            [
+                {
+                    "id": 501,
+                    "analysis": 55,
+                    "site": 77,
+                    "location": 88,
+                    "name_col1": "timestamp",
+                    "units_col1": "s",
+                    "value_col1": [1_741_781_112.0],
+                    "name_col2": "temperature",
+                    "units_col2": "degC",
+                    "value_col2": [10.0],
+                    "short_description": "DA8F:temperature",
+                    "description": "Existing shared series",
+                    "related_object": {"type": "shm.signal", "id": 901},
+                    "data_additional": {
+                        "analysis_name": "CeitCorrosionMonitoring",
+                        "analysis_kind": "time_series",
+                        "result_scope": "location",
+                        "sensor_identifier": "DA8F",
+                        "metric": "temperature",
+                        "signal_id": 901,
+                    },
+                }
+            ]
+        )
+
+    def list_analyses(self, name: str | None = None, **kwargs: object) -> dict[str, pd.DataFrame]:
+        return {"data": pd.DataFrame([{"id": 55, "name": name or "CeitCorrosionMonitoring"}])}
+
+    def list_results(self, **kwargs: object) -> dict[str, pd.DataFrame]:
+        if kwargs.get("analysis") == 55 or kwargs.get("analysis__id") == 55:
+            rows = [
+                self.result_rows.to_dict(orient="records")[0],
+                *self.created_results,
+                *[payload for _, payload in self.updated_results],
+            ]
+            frame = pd.DataFrame(rows)
+            short_description = kwargs.get("short_description")
+            if short_description is not None and not frame.empty:
+                mask = frame["short_description"] == short_description
+                frame = frame.loc[mask, :].reset_index(drop=True)
+            return {"data": frame}
+        return {"data": pd.DataFrame()}
+
+
 def test_load_ceit_measurements_sanitizes_trailing_commas(tmp_path: Path) -> None:
     payload = tmp_path / "meas.json"
     payload.write_text(
@@ -130,6 +205,42 @@ def test_ceit_upsert_measurements_patches_existing_and_creates_missing(tmp_path:
     patched_payload = api.updated_results[0][1]
     assert patched_payload["value_col1"] == [1741781112.0, 1741781172.0]
     assert patched_payload["value_col2"] == [10.0, 11.0]
+
+
+def test_ceit_upsert_measurements_uses_progress_bar(tmp_path: Path) -> None:
+    payload = tmp_path / "meas.json"
+    payload.write_text(
+        """
+        [
+            {
+                "date": "2025-03-12",
+                "time": "12:05:12",
+                "sensor_identifier": "DA8F",
+                "temperatura": 10.0,
+                "bateria": 2.0,
+                "Tof": [3.0],
+                "Amplitude": 4.0,
+                "MeasGain": 5.0
+            }
+        ]
+        """,
+        encoding="utf-8",
+    )
+    api = StubCeitApi()
+    service = CeitResultsService(api=api)
+    progress = ProgressBarRecorder()
+
+    with patch("owi.metadatabase.results.services.ceit.tqdm", new=progress.factory):
+        service.upsert_measurements(payload, site_id=77)
+
+    assert len(progress.calls) == 1
+    assert progress.calls[0]["kwargs"] == {
+        "total": len(CEIT_METRICS),
+        "desc": "Uploading CEIT result series",
+        "unit": "series",
+        "disable": False,
+    }
+    assert progress.calls[0]["updates"] == [1] * len(CEIT_METRICS)
 
 
 def test_plot_ceit_analyses_contains_sensor_dropdown() -> None:
@@ -291,6 +402,55 @@ class TestCeitResultsService:
         for result in results:
             assert result.site_id == 1
 
+    def test_build_shared_analysis_definition(self) -> None:
+        service = CeitResultsService(model_definition_id=12, location_id=88)
+        defn = service.build_shared_analysis_definition(source="test.json")
+        assert defn.name == "CeitCorrosionMonitoring"
+        assert defn.model_definition_id == 12
+        assert defn.location_id == 88
+        assert defn.source == "test.json"
+        assert defn.additional_data["shared_analysis"] is True
+
+    def test_build_sensor_results_with_shared_series_keys_and_signal_linkage(self) -> None:
+        meas = CeitMeasurement(
+            date="2025-03-12",
+            time="12:05:12",
+            sensor_identifier="DA8F",
+            temperatura=10.0,
+            bateria=2.0,
+            Tof=[3.0],
+            Amplitude=4.0,
+            MeasGain=5.0,
+        )
+        service = CeitResultsService(model_definition_id=12, location_id=88)
+        results = service.build_sensor_results(
+            "DA8F",
+            [meas],
+            site_id=77,
+            location_id=88,
+            analysis_name="CeitCorrosionMonitoring",
+            use_stable_series_keys=True,
+            signal_id=901,
+            signal_history={"id": 501, "legacy_signal_id": "DA8F"},
+        )
+        assert len(results) == len(CEIT_METRICS)
+        assert {result.short_description for result in results} == {
+            "DA8F:temperature",
+            "DA8F:battery",
+            "DA8F:tof",
+            "DA8F:amplitude",
+            "DA8F:meas_gain",
+        }
+        for result in results:
+            assert result.analysis_name == "CeitCorrosionMonitoring"
+            assert result.site_id == 77
+            assert result.location_id == 88
+            assert result.result_scope == "location"
+            assert result.related_object is not None
+            assert result.related_object.type == "shm.signal"
+            assert result.related_object.id == 901
+            assert result.data_additional["signal_id"] == 901
+
     def test_merge_result_series_appends_new_points(self) -> None:
         from owi.metadatabase.results.models import AnalysisKind, ResultScope, ResultSeries, ResultVector
 
@@ -338,6 +498,117 @@ class TestCeitResultsService:
         service = CeitResultsService(model_definition_id=12)
         merged, appended = service._merge_result_series(existing, existing)
         assert appended == 0
+
+    def test_upsert_measurements_to_shared_analysis_patches_existing_and_creates_missing(self, tmp_path: Path) -> None:
+        payload = tmp_path / "meas.json"
+        payload.write_text(
+            """
+            [
+                {
+                    "date": "2025-03-12",
+                    "time": "12:05:12",
+                    "sensor_identifier": "DA8F",
+                    "temperatura": 10.0,
+                    "bateria": 2.0,
+                    "Tof": [3.0],
+                    "Amplitude": 4.0,
+                    "MeasGain": 5.0
+                },
+                {
+                    "date": "2025-03-12",
+                    "time": "12:06:12",
+                    "sensor_identifier": "DA8F",
+                    "temperatura": 11.0,
+                    "bateria": 2.1,
+                    "Tof": [3.1],
+                    "Amplitude": 4.1,
+                    "MeasGain": 5.1
+                }
+            ]
+            """,
+            encoding="utf-8",
+        )
+        api = SharedAnalysisStubCeitApi()
+        service = CeitResultsService(api=api, model_definition_id=12, location_id=88)
+        result = service.upsert_measurements_to_shared_analysis(
+            payload,
+            site_id=77,
+            location_id=88,
+            signal_ids_by_sensor={"DA8F": 901},
+            signal_history_by_sensor={"DA8F": {"id": 501, "legacy_signal_id": "DA8F"}},
+        )
+        assert result["analysis_id"] == 55
+        assert result["analysis_name"] == "CeitCorrosionMonitoring"
+        assert result["analysis_created"] is False
+        summary = result["summary"]
+        assert any(row["action"] == "patched" and row["series_key"] == "DA8F:temperature" for row in summary)
+        assert any(row["action"] == "created" and row["series_key"] == "DA8F:battery" for row in summary)
+        assert api.updated_results
+        updated_payload = api.updated_results[0][1]
+        assert updated_payload["short_description"] == "DA8F:temperature"
+        assert updated_payload["location"] == 88
+        assert updated_payload["related_object"] == {"type": "shm.signal", "id": 901}
+        assert updated_payload["value_col1"] == [1741781112.0, 1741781172.0]
+        assert updated_payload["value_col2"] == [10.0, 11.0]
+
+    def test_upsert_measurements_to_shared_analysis_uses_progress_bar(self, tmp_path: Path) -> None:
+        payload = tmp_path / "meas.json"
+        payload.write_text(
+            """
+            [
+                {
+                    "date": "2025-03-12",
+                    "time": "12:05:12",
+                    "sensor_identifier": "DA8F",
+                    "temperatura": 10.0,
+                    "bateria": 2.0,
+                    "Tof": [3.0],
+                    "Amplitude": 4.0,
+                    "MeasGain": 5.0
+                }
+            ]
+            """,
+            encoding="utf-8",
+        )
+        api = SharedAnalysisStubCeitApi()
+        service = CeitResultsService(api=api, model_definition_id=12, location_id=88)
+        progress = ProgressBarRecorder()
+
+        with patch("owi.metadatabase.results.services.ceit.tqdm", new=progress.factory):
+            service.upsert_measurements_to_shared_analysis(
+                payload,
+                site_id=77,
+                location_id=88,
+                signal_ids_by_sensor={"DA8F": 901},
+            )
+
+        assert len(progress.calls) == 1
+        assert progress.calls[0]["kwargs"] == {
+            "total": len(CEIT_METRICS),
+            "desc": "Uploading shared CEIT result series",
+            "unit": "series",
+            "disable": False,
+        }
+        assert progress.calls[0]["updates"] == [1] * len(CEIT_METRICS)
+
+    def test_load_shared_backend_frame_reconstructs_signal_metadata(self) -> None:
+        api = SharedAnalysisStubCeitApi()
+        service = CeitResultsService(api=api, model_definition_id=12, location_id=88)
+        frame = service.load_shared_backend_frame(analysis_id=55)
+        assert not frame.empty
+        assert set(frame.columns) == {
+            "analysis_name",
+            "short_description",
+            "sensor_identifier",
+            "metric",
+            "signal_id",
+            "timestamp",
+            "value",
+        }
+        assert frame.iloc[0]["analysis_name"] == "CeitCorrosionMonitoring"
+        assert frame.iloc[0]["sensor_identifier"] == "DA8F"
+        assert frame.iloc[0]["metric"] == "temperature"
+        assert frame.iloc[0]["signal_id"] == 901
 
 
 class TestPlotCeitAnalyses:

@@ -34,6 +34,7 @@ print(f"Created analysis: {analysis_id}")
 ## Upload Result Rows
 
 Each result payload maps to a single `Result` row in the backend.
+`ResultsAPI.create_results_bulk(...)` renders a `tqdm` progress bar automatically.
 
 ```python
 from owi.metadatabase.results.serializers import DjangoResultSerializer
@@ -58,7 +59,9 @@ If bulk upload is not supported by the target backend, the SDK can also
 create results one at a time:
 
 ```python
-for payload in payloads:
+from tqdm.auto import tqdm
+
+for payload in tqdm(payloads, desc="Uploading result rows", unit="row"):
     api.create_result(payload)
 ```
 

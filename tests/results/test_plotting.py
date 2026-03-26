@@ -174,46 +174,54 @@ class TestBuildDropdownPlotResponse:
         chart = Bar()
         chart.add_xaxis(["a"])
         chart.add_yaxis("S1", [1])
-        response = build_dropdown_plot_response({"FA1": chart}, dropdown_label="Metric")
+        with patch(
+            "owi.metadatabase.results.plotting.response._build_widget_dropdown",
+            return_value=None,
+        ):
+            response = build_dropdown_plot_response({"FA1": chart}, dropdown_label="Metric")
         assert response.notebook is not None
         assert "ResizeObserver" in response.notebook.data
         assert "window.frameElement.style.height" in response.notebook.data
 
-    def test_prefers_html_notebook_renderer_when_available(self) -> None:
+    def test_prefers_widget_notebook_renderer_when_available(self) -> None:
         chart = Bar()
         chart.add_xaxis(["a"])
         chart.add_yaxis("S1", [1])
         widget_sentinel = object()
         with (
             patch(
-                "owi.metadatabase.results.plotting.response.HTML",
-                return_value=widget_sentinel,
-            ) as html_builder,
-            patch(
                 "owi.metadatabase.results.plotting.response._build_widget_dropdown",
+                return_value=widget_sentinel,
+            ) as widget_builder,
+            patch(
+                "owi.metadatabase.results.plotting.response._build_iframe_notebook_html",
                 return_value=object(),
-            ) as widget_builder,
-        ):
-            response = build_dropdown_plot_response({"key1": chart}, dropdown_label="Metric")
-        html_builder.assert_called_once()
-        widget_builder.assert_not_called()
-        assert response.notebook is widget_sentinel
-
-    def test_falls_back_to_widget_notebook_renderer_without_html(self) -> None:
-        chart = Bar()
-        chart.add_xaxis(["a"])
-        chart.add_yaxis("S1", [1])
-        widget_sentinel = object()
-        with (
-            patch("owi.metadatabase.results.plotting.response.HTML", None),
-            patch(
-                "owi.metadatabase.results.plotting.response._build_widget_dropdown",
-                return_value=widget_sentinel,
-            ) as widget_builder,
+            ) as iframe_builder,
         ):
             response = build_dropdown_plot_response({"key1": chart}, dropdown_label="Metric")
         widget_builder.assert_called_once()
+        iframe_builder.assert_not_called()
         assert response.notebook is widget_sentinel
+
+    def test_falls_back_to_html_notebook_renderer_without_widget(self) -> None:
+        chart = Bar()
+        chart.add_xaxis(["a"])
+        chart.add_yaxis("S1", [1])
+        html_sentinel = object()
+        with (
+            patch(
+                "owi.metadatabase.results.plotting.response._build_widget_dropdown",
+                return_value=None,
+            ) as widget_builder,
+            patch(
+                "owi.metadatabase.results.plotting.response._build_iframe_notebook_html",
+                return_value=html_sentinel,
+            ) as iframe_builder,
+        ):
+            response = build_dropdown_plot_response({"key1": chart}, dropdown_label="Metric")
+        widget_builder.assert_called_once()
+        iframe_builder.assert_called_once()
+        assert response.notebook is html_sentinel
 
 
 class TestBuildNestedDropdownPlotResponse:
@@ -287,41 +295,20 @@ class TestBuildNestedDropdownPlotResponse:
         assert "function resetChart()" in response.html
         assert "resetChart();" in response.html
 
-    def test_prefers_nested_html_notebook_renderer_when_available(self) -> None:
+    def test_prefers_nested_widget_notebook_renderer_when_available(self) -> None:
         chart = Bar()
         chart.add_xaxis(["a"])
         chart.add_yaxis("S1", [1])
         widget_sentinel = object()
         with (
             patch(
-                "owi.metadatabase.results.plotting.response.HTML",
-                return_value=widget_sentinel,
-            ) as html_builder,
-            patch(
                 "owi.metadatabase.results.plotting.response._build_nested_widget_dropdown",
+                return_value=widget_sentinel,
+            ) as widget_builder,
+            patch(
+                "owi.metadatabase.results.plotting.response._build_iframe_notebook_html",
                 return_value=object(),
-            ) as widget_builder,
-        ):
-            response = build_nested_dropdown_plot_response(
-                {"FA1": {"INFL": chart}},
-                primary_label="Metric",
-                secondary_label="Reference",
-            )
-        html_builder.assert_called_once()
-        widget_builder.assert_not_called()
-        assert response.notebook is widget_sentinel
-
-    def test_falls_back_to_nested_widget_notebook_renderer_without_html(self) -> None:
-        chart = Bar()
-        chart.add_xaxis(["a"])
-        chart.add_yaxis("S1", [1])
-        widget_sentinel = object()
-        with (
-            patch("owi.metadatabase.results.plotting.response.HTML", None),
-            patch(
-                "owi.metadatabase.results.plotting.response._build_nested_widget_dropdown",
-                return_value=widget_sentinel,
-            ) as widget_builder,
+            ) as iframe_builder,
         ):
             response = build_nested_dropdown_plot_response(
                 {"FA1": {"INFL": chart}},
@@ -329,4 +316,29 @@ class TestBuildNestedDropdownPlotResponse:
                 secondary_label="Reference",
             )
         widget_builder.assert_called_once()
+        iframe_builder.assert_not_called()
         assert response.notebook is widget_sentinel
+
+    def test_falls_back_to_nested_html_notebook_renderer_without_widget(self) -> None:
+        chart = Bar()
+        chart.add_xaxis(["a"])
+        chart.add_yaxis("S1", [1])
+        html_sentinel = object()
+        with (
+            patch(
+                "owi.metadatabase.results.plotting.response._build_nested_widget_dropdown",
+                return_value=None,
+            ) as widget_builder,
+            patch(
+                "owi.metadatabase.results.plotting.response._build_iframe_notebook_html",
+                return_value=html_sentinel,
+            ) as iframe_builder,
+        ):
+            response = build_nested_dropdown_plot_response(
+                {"FA1": {"INFL": chart}},
+                primary_label="Metric",
+                secondary_label="Reference",
+            )
+        widget_builder.assert_called_once()
+        iframe_builder.assert_called_once()
+        assert response.notebook is html_sentinel

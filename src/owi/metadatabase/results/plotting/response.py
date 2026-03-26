@@ -15,18 +15,14 @@ from ..models import PlotResponse
 from .theme import MONOSPACE_FONT_FAMILY, ChartLike, _apply_monospace_theme
 
 HTML: Any | None
-display: Any | None
 widgets: Any | None
 
 try:
     from IPython.display import HTML as _HTML
-    from IPython.display import display as _display
 except ImportError:  # pragma: no cover - only used in notebooks.
     HTML = None
-    display = None
 else:
     HTML = _HTML
-    display = _display
 
 try:
     import ipywidgets as _widgets
@@ -51,19 +47,23 @@ def _build_widget_dropdown(
     *,
     dropdown_label: str,
     default_key: str,
+    frame_height: int,
 ) -> Any | None:
     """Build a notebook-native dropdown widget when ipywidgets is available."""
-    if widgets is None or display is None:
+    if widgets is None:
         return None
-    show = cast(Any, display)
-
     selector = widgets.Dropdown(
         options=list(charts_by_key.keys()),
         value=default_key,
         description=f"{dropdown_label}:",
         layout=widgets.Layout(width="320px"),
     )
-    output = widgets.Output()
+    chart_frame = widgets.HTML(
+        value=_build_iframe_markup(
+            charts_by_key[default_key].render_embed(),
+            frame_height=frame_height,
+        )
+    )
     style = widgets.HTML(
         value=(
             "<style>"
@@ -80,18 +80,18 @@ def _build_widget_dropdown(
     )
 
     def render_selected(key: str) -> None:
-        with output:
-            output.clear_output(wait=True)
-            show(_render_notebook(charts_by_key[key]))
+        chart_frame.value = _build_iframe_markup(
+            charts_by_key[key].render_embed(),
+            frame_height=frame_height,
+        )
 
     def handle_change(change: dict[str, Any]) -> None:
         if change.get("name") == "value" and change.get("new") is not None:
             render_selected(str(change["new"]))
 
     selector.observe(handle_change, names="value")
-    container = widgets.VBox([style, selector, output])
+    container = widgets.VBox([style, selector, chart_frame])
     container.add_class("owi-results-dropdown-widget")
-    render_selected(default_key)
     return container
 
 
@@ -102,12 +102,11 @@ def _build_nested_widget_dropdown(
     secondary_label: str,
     default_primary_key: str,
     default_secondary_key: str,
+    frame_height: int,
 ) -> Any | None:
     """Build a notebook-native pair of dependent dropdown widgets."""
-    if widgets is None or display is None:
+    if widgets is None:
         return None
-    show = cast(Any, display)
-
     primary_selector = widgets.Dropdown(
         options=list(charts_by_primary_key.keys()),
         value=default_primary_key,
@@ -120,7 +119,12 @@ def _build_nested_widget_dropdown(
         description=f"{secondary_label}:",
         layout=widgets.Layout(width="280px"),
     )
-    output = widgets.Output()
+    chart_frame = widgets.HTML(
+        value=_build_iframe_markup(
+            charts_by_primary_key[default_primary_key][default_secondary_key].render_embed(),
+            frame_height=frame_height,
+        )
+    )
     style = widgets.HTML(
         value=(
             "<style>"
@@ -137,9 +141,10 @@ def _build_nested_widget_dropdown(
     )
 
     def render_selected(primary_key: str, secondary_key: str) -> None:
-        with output:
-            output.clear_output(wait=True)
-            show(_render_notebook(charts_by_primary_key[primary_key][secondary_key]))
+        chart_frame.value = _build_iframe_markup(
+            charts_by_primary_key[primary_key][secondary_key].render_embed(),
+            frame_height=frame_height,
+        )
 
     def handle_primary_change(change: dict[str, Any]) -> None:
         if change.get("name") != "value" or change.get("new") is None:
@@ -159,9 +164,8 @@ def _build_nested_widget_dropdown(
     primary_selector.observe(handle_primary_change, names="value")
     secondary_selector.observe(handle_secondary_change, names="value")
     selectors = widgets.HBox([primary_selector, secondary_selector])
-    container = widgets.VBox([style, selectors, output])
+    container = widgets.VBox([style, selectors, chart_frame])
     container.add_class("owi-results-dropdown-widget")
-    render_selected(default_primary_key, default_secondary_key)
     return container
 
 
@@ -199,6 +203,13 @@ def _build_iframe_notebook_html(html: str, *, frame_height: int) -> Any | None:
         return None
     import warnings
 
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Consider using IPython.display.IFrame instead")
+        return HTML(_build_iframe_markup(html, frame_height=frame_height))
+
+
+def _build_iframe_markup(html: str, *, frame_height: int) -> str:
+    """Build iframe markup for notebook-hosted chart HTML."""
     iframe_resizer = """
 <script>
 (function() {
@@ -242,9 +253,26 @@ def _build_iframe_notebook_html(html: str, *, frame_height: int) -> Any | None:
         f' height="{frame_height}" '
         f' srcdoc="{escaped_srcdoc}"></iframe>'
     )
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message="Consider using IPython.display.IFrame instead")
-        return HTML(iframe_html)
+    return iframe_html
+
+
+def _select_notebook_dropdown_renderer(
+    *,
+    widget_renderer: Any | None,
+    html: str,
+    frame_height: int,
+) -> Any | None:
+    """Prefer widgets in notebooks, then fall back to HTML-based renderers."""
+    if widget_renderer is not None:
+        return widget_renderer
+
+    notebook = _build_iframe_notebook_html(html, frame_height=frame_height)
+    if notebook is not None:
+        return notebook
+
+    if HTML is not None:
+        return HTML(html)
+    return None
 
 
 def _dependency_url(dependency: str) -> str:
@@ -593,19 +621,17 @@ def build_dropdown_plot_response(
     </script>
 </div>
 """.strip()
-    notebook = _build_iframe_notebook_html(
-        html,
+    widget_notebook = _build_widget_dropdown(
+        charts_by_key,
+        dropdown_label=dropdown_label,
+        default_key=selected_key,
         frame_height=_parse_pixel_height(height, default=420) + 90,
     )
-    if notebook is None:
-        if HTML is not None:
-            notebook = HTML(html)
-        elif widgets is not None and display is not None:
-            notebook = _build_widget_dropdown(
-                charts_by_key,
-                dropdown_label=dropdown_label,
-                default_key=selected_key,
-            )
+    notebook = _select_notebook_dropdown_renderer(
+        widget_renderer=widget_notebook,
+        html=html,
+        frame_height=_parse_pixel_height(height, default=420) + 90,
+    )
     return PlotResponse(
         chart=charts_by_key[selected_key],
         notebook=notebook,
@@ -788,21 +814,19 @@ def build_nested_dropdown_plot_response(
     </script>
 </div>
 """.strip()
-    notebook = _build_iframe_notebook_html(
-        html,
+    widget_notebook = _build_nested_widget_dropdown(
+        charts_by_primary_key,
+        primary_label=primary_label,
+        secondary_label=secondary_label,
+        default_primary_key=selected_primary_key,
+        default_secondary_key=selected_secondary_key,
         frame_height=_parse_pixel_height(height, default=420) + 120,
     )
-    if notebook is None:
-        if HTML is not None:
-            notebook = HTML(html)
-        elif widgets is not None and display is not None:
-            notebook = _build_nested_widget_dropdown(
-                charts_by_primary_key,
-                primary_label=primary_label,
-                secondary_label=secondary_label,
-                default_primary_key=selected_primary_key,
-                default_secondary_key=selected_secondary_key,
-            )
+    notebook = _select_notebook_dropdown_renderer(
+        widget_renderer=widget_notebook,
+        html=html,
+        frame_height=_parse_pixel_height(height, default=420) + 120,
+    )
     return PlotResponse(
         chart=charts_by_primary_key[selected_primary_key][selected_secondary_key],
         notebook=notebook,

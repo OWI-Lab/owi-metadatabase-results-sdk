@@ -23,6 +23,7 @@ from owi.metadatabase._utils.exceptions import (  # ty: ignore[unresolved-import
     InvalidParameterError,
 )
 from owi.metadatabase.io import API  # ty: ignore[unresolved-import]
+from tqdm.auto import tqdm
 
 from .endpoints import DEFAULT_RESULTS_ENDPOINTS, ResultsEndpoints
 
@@ -210,12 +211,17 @@ class ResultsAPI(API):
         a bulk mutation endpoint.
         """
         serialized_payloads = [dict(payload) for payload in payloads]
+        if not serialized_payloads:
+            return {"data": pd.DataFrame(), "exists": False, "response": None}
+
         try:
-            response = self._send_json_request(
-                self.endpoints.result_bulk,
-                serialized_payloads,
-                method="post",
-            )
+            with tqdm(total=1, desc="Uploading result batch", unit="request") as progress:
+                response = self._send_json_request(
+                    self.endpoints.result_bulk,
+                    serialized_payloads,
+                    method="post",
+                )
+                progress.update(1)
             df = self._response_to_dataframe(response)
             return {"data": df, "exists": not df.empty, "response": response}
         except APIConnectionError as error:
@@ -224,6 +230,10 @@ class ResultsAPI(API):
             if status_code not in {404, 405, 500}:
                 raise
 
-        rows = [self.create_result(payload)["data"] for payload in serialized_payloads]
+        rows = []
+        with tqdm(total=len(serialized_payloads), desc="Uploading result rows", unit="row") as progress:
+            for payload in serialized_payloads:
+                rows.append(self.create_result(payload)["data"])
+                progress.update(1)
         df = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
         return {"data": df, "exists": not df.empty, "response": None}
