@@ -1,4 +1,4 @@
-# 0 Architectural refactor of ceit.py in `owi-metadatabase-results-sdk`
+# 0 ~Architectural refactor of ceit.py in `owi-metadatabase-results-sdk`~
 
 Currently, `analyses/ceit.py` and `plotting/ceit.py`, contain a mix of functions for building payloads, making API calls, and processing results for the specific usecase of CEIT data. Consequently, there is a services/ceit.py file that imports `analyses/ceit.py` and `plotting/ceit.py` to build the backend analysis and results, and then plot them. This structure is not ideal for maintainability and scalability.
 
@@ -22,7 +22,7 @@ I am running the notebooks in the scripts/ folder for verification. I have the f
   Example: Frequency [Hz] -> Frequency, Hz
 * This warning should be removed from the output: `/home/pietro.dantuono@24SEA.local/Projects/SMARTLIFE/OWI-metadatabase-SDK/owi-metadatabase-results-sdk/.venv/lib/python3.13/site-packages/IPython/core/events.py:100: UserWarning: constrained_layout not applied because axes sizes collapsed to zero.  Try making figure larger or Axes decorations smaller.`
 
-# 2 Bugfix(`owi-metadatabase-results-sdk`)
+# 2 Bugfix(`results/analyses/ceit.py`): `build_sensor_results` does not link Sensor types to Results
 
 > [!IMPORTANT] There is currently no way to link a Sensor type of object to a Result for CEIT type of data.
 > `build_sensor_results` in `services/ceit.py` expects only Signal instead of Signal/Sensor as a
