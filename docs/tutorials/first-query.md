@@ -85,8 +85,8 @@ The `ResultsService` facade provides typed deserialization and
 integrated plotting on top of the raw API:
 
 ```python
-from owi.metadatabase.results import ResultsService, ResultsAPI
-from owi.metadatabase.results.services import ApiResultsRepository
+from owi.metadatabase.results import ResultsAPI
+from owi.metadatabase.results.services import ApiResultsRepository, ResultsService
 
 api = ResultsAPI(api_root="https://owimetadatabase-dev.azurewebsites.net/api/v1",
                  token="your-api-token")

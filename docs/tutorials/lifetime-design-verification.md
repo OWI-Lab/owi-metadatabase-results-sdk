@@ -1,9 +1,9 @@
-# Lifetime Design Frequencies Workflow
+# Lifetime Design Verification Workflow
 
 !!! example
-    This tutorial walks through the complete `LifetimeDesignFrequencies` lifecycle:
-    import workbook data, upload results to the backend, retrieve them, and render
-    interactive plots — all as explicit, auditable steps.
+     This tutorial walks through the complete `LifetimeDesignVerification` lifecycle:
+     import workbook data, upload results to the backend, retrieve them, and render
+     interactive plots — all as explicit, auditable steps.
 
 ## Prerequisites
 
@@ -33,11 +33,10 @@ import datetime
 from pathlib import Path
 
 import pandas as pd
-from IPython.display import display
 from owi.metadatabase.geometry.io import GeometryAPI
 from owi.metadatabase.locations.io import LocationsAPI
 
-from owi.metadatabase.results import LifetimeDesignFrequencies, ResultsAPI
+from owi.metadatabase.results import LifetimeDesignVerification, ResultsAPI
 from owi.metadatabase.results.models import AnalysisDefinition
 from owi.metadatabase.results.serializers import (
     DjangoAnalysisSerializer,
@@ -72,9 +71,8 @@ UPLOAD_RESULTS = True
 
 ## Step 3 — Resolve Project and Location Metadata
 
-Before reading the workbook, resolve the backend ids for the target
-project site, model definition, asset locations, and any existing
-analysis for the chosen timestamp.
+Before uploading results, resolve the backend identifiers for the target
+project site, model definition, and asset locations.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -108,7 +106,7 @@ graph TD
 locations_api = LocationsAPI(api_root=BASE_URL, token=TOKEN)
 geometry_api = GeometryAPI(api_root=BASE_URL, token=TOKEN)
 results_api = ResultsAPI(api_root=BASE_URL, token=TOKEN)
-analysis = LifetimeDesignFrequencies()
+analysis = LifetimeDesignVerification()
 analysis_serializer = DjangoAnalysisSerializer()
 result_serializer = DjangoResultSerializer()
 results_service = ResultsService(
@@ -159,8 +157,8 @@ existing_analysis_id = (
 
 ## Step 4 — Load and Inspect the Workbook Data
 
-Read the Excel sheet and identify the frequency columns (those ending
-with `[Hz]`) that will feed the analysis workflow.
+Read the Excel sheet and identify the verification-frequency columns
+(those ending with `(Hz)`) that will feed the analysis workflow.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -188,14 +186,12 @@ graph TD
 ```
 
 ```python
-sheet_name = "Lifetime -  Design frequencies"
+sheet_name = "Lifetime -  Design verification"
 frequency_frame = pd.read_excel(WORKBOOK, sheet_name=sheet_name)
-
-# Detect columns like "FA1 [Hz]", "SS1 [Hz]" and strip the unit suffix.
 metric_columns = {
-    str(col).replace(" [Hz]", ""): col
+    str(col).replace(" (Hz)", ""): col
     for col in frequency_frame.columns
-    if isinstance(col, str) and col.endswith(" [Hz]")
+    if isinstance(col, str) and col.endswith(" (Hz)")
 }
 ```
 
@@ -224,26 +220,29 @@ graph TD
     B -- no --> D["Reuse the existing analysis id"]
     C --> E["Selected analysis id"]
     D --> E
-    E --> F["Build prepared_rows and result_series"]
-    F --> G["Serialize result payloads"]
-    G --> H{"Upload result rows?"}
-    H -- yes --> I["Bulk create or update location rows"]
-    H -- no --> J["Skip writes"]
-    I --> K["Upload summary"]
-    J --> K
+    E --> F["Clean metrics and build prepared_rows"]
+    F --> G["Create result_series"]
+    G --> H["Serialize result payloads"]
+    H --> I{"Upload result rows?"}
+    I -- yes --> J["Bulk create or update location rows"]
+    I -- no --> K["Skip writes"]
+    J --> L["Upload summary"]
+    K --> L
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
     classDef decision fill:#F7D9D1,stroke:#C04A2F,color:#5A1F14;
 
-    class C,I api;
-    class D,E,K keep;
-    class A,F,G,J build;
-    class B,H decision;
+    class C,J api;
+    class D,E,L keep;
+    class A,F,G,H,K build;
+    class B,I decision;
 ```
 
 ```python
+from math import isfinite
+
 # -- Analysis definition
 analysis_definition = AnalysisDefinition(
     name=analysis.analysis_name,
@@ -252,7 +251,7 @@ analysis_definition = AnalysisDefinition(
     source_type="json",
     source=str(WORKBOOK),
     timestamp=ANALYSIS_TIMESTAMP,
-    description="Shared lifetime design frequencies upload.",
+    description="Shared lifetime design verification upload.",
     additional_data={
         "input_file": WORKBOOK.name,
         "sheet_name": sheet_name,
@@ -267,15 +266,26 @@ if CREATE_NEW_ANALYSIS:
 else:
     analysis_id = existing_analysis_id
 
+# -- Clean metric values
+def _clean_metric(value: object) -> float | None:
+    """Convert NaN/Inf metric values to None."""
+    if value is None:
+        return None
+    try:
+        fval = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if not isfinite(fval) else fval
+
 # -- Prepare rows and convert to typed ResultSeries
 prepared_rows = [
     {
+        "timestamp": row["timestamp"],
         "turbine": str(row["Turbine"]),
-        "reference": str(row["Reference"]),
         "site_id": site_id,
         "location_id": location_title_to_id_map.get(str(row["Turbine"])),
         **{
-            metric: row.get(source_column)
+            metric: _clean_metric(row.get(source_column))
             for metric, source_column in metric_columns.items()
         },
     }
@@ -298,8 +308,8 @@ if UPLOAD_RESULTS:
 
 ## Step 6 — Retrieve and Reconstruct
 
-Read the persisted result rows back from the API and reconstruct the
-normalized analysis frame.
+Read the persisted analysis and result rows back from the API and
+reconstruct the normalized analysis frame.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -312,7 +322,7 @@ graph TD
     A["Selected analysis id"] --> B["Read saved result rows"]
     B --> C["Raw backend table"]
     C --> D["Convert rows back to result series"]
-    D --> E["Rebuild the lifetime design dataframe"]
+    D --> E["Rebuild the verification dataframe"]
     E --> F["Retrieved dataframe ready"]
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
@@ -340,13 +350,12 @@ print(retrieved_frame.head())
 
 ## Step 7 — Plot the Results
 
-The `ResultsService` provides three plot types for this analysis:
+The `ResultsService` provides two plot types for this analysis:
 
 | Plot type | Visualization |
 |-----------|---------------|
-| `comparison` | Metrics across references with a location dropdown. |
-| `location` | Values grouped by turbine with a metric dropdown. |
-| `geo` | Results projected onto a geographic site map. |
+| `time_series` | Verification metrics evolving across timestamps. |
+| `comparison` | Metric values compared across turbines or grouped series. |
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -356,27 +365,30 @@ The `ResultsService` provides three plot types for this analysis:
   'clusterBorder': '#CBD5E1'
 }}}%%
 graph TD
-    A["Selected analysis id"] --> B["Create comparison plot"]
-    A --> C["Create location plot"]
-    A --> D["Create geo plot"]
-    B --> E["Comparison widget"]
-    C --> F["Location widget"]
-    D --> G["Geo widget"]
-    E --> H["Display plots"]
-    F --> H
-    G --> H
+    A["Selected analysis id"] --> B["Create time-series plot"]
+    A --> C["Create comparison plot"]
+    B --> D["Time-series widget"]
+    C --> E["Comparison widget"]
+    D --> F["Display plots"]
+    E --> F
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
 
-    class B,C,D api;
-    class E,F,G,H keep;
+    class B,C api;
+    class D,E,F keep;
     class A build;
 ```
 
 ```python
 filters = {"analysis_id": analysis_id}
+
+time_series_plot = results_service.plot_results(
+    analysis.analysis_name,
+    filters=filters,
+    plot_type="time_series",
+)
 
 comparison_plot = results_service.plot_results(
     analysis.analysis_name,
@@ -384,22 +396,9 @@ comparison_plot = results_service.plot_results(
     plot_type="comparison",
 )
 
-location_plot = results_service.plot_results(
-    analysis.analysis_name,
-    filters=filters,
-    plot_type="location",
-)
-
-geo_plot = results_service.plot_results(
-    analysis.analysis_name,
-    filters=filters,
-    plot_type="geo",
-)
-
 # Display in a notebook environment.
+display(time_series_plot.notebook)
 display(comparison_plot.notebook)
-display(location_plot.notebook)
-display(geo_plot.notebook)
 ```
 
 ---
@@ -412,13 +411,12 @@ display(geo_plot.notebook)
 - How to conditionally create or reuse analyses and upload result rows
   with `create_or_update_results_bulk`.
 - How to retrieve and reconstruct typed result series from persisted data.
-- How to render comparison, location, and geo plots through
-  `ResultsService`.
+- How to render time-series and comparison plots through `ResultsService`.
 
 ## Next Steps
 
-- [Lifetime Design Verification Workflow](lifetime-design-verification.md) —
-  the same upload-retrieve-plot cycle for design verification data.
+- [Lifetime Design Frequencies Workflow](lifetime-design-frequencies.md) —
+  the same upload-retrieve-plot cycle for design frequency data.
 - [Reference: Analysis Queries](../reference/query-examples/analyses.md) —
   Django ORM examples for the `Analysis` model.
 - [Explanation: Architecture](../explanation/architecture.md) —

@@ -363,7 +363,7 @@ api.get_results_raw(id=3372)
 ### Typed Deserialization Through ResultsService
 
 ```python
-from owi.metadatabase.results import ResultsService
+from owi.metadatabase.results.services import ResultsService
 from owi.metadatabase.results.services import ApiResultsRepository
 from owi.metadatabase.results.serializers import DjangoResultSerializer
 

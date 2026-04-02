@@ -16,8 +16,8 @@
 
 ## Workflows
 - Dev install (recommended): uv sync --dev (see README.md).
-- Tests and coverage: uv run invoke test.all (tasks in tasks/test.py). This runs pytest with doctests enabled (see pyproject.toml).
-- Lint/format/type checks: uv run invoke quality.all (ruff format/check + ty) in tasks/quality.py.
+- Tests and coverage: uv run invoke test (tasks in tasks/test.py). This runs pytest with doctests enabled (see pyproject.toml).
+- Lint/format/type checks: uv run invoke quality (ruff format/check + ty) in tasks/quality.py.
 - Docs: uv run invoke docs.build or docs.serve (tasks/docs.py, zensical).
 - Use uv-managed environment; prefer uv run ... for test/quality/docs commands.
 

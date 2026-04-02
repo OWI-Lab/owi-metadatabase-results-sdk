@@ -17,7 +17,7 @@ uv run invoke test.run
 Or the full pipeline (tests + coverage server):
 
 ```bash
-uv run invoke test.all
+uv run invoke test
 ```
 
 ## Quality Gate

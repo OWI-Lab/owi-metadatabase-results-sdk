@@ -10,8 +10,8 @@ This guide shows how to render interactive charts from persisted results.
 ## Plot Through ResultsService
 
 ```python
-from owi.metadatabase.results import ResultsAPI, ResultsService
-from owi.metadatabase.results.services import ApiResultsRepository
+from owi.metadatabase.results import ResultsAPI
+from owi.metadatabase.results.services import ApiResultsRepository, ResultsService
 
 api = ResultsAPI(api_root="https://owimetadatabase-dev.azurewebsites.net/api/v1",
                  token="your-api-token")

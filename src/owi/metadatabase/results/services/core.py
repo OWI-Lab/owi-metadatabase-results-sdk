@@ -41,6 +41,10 @@ class ApiResultsRepository:
         """Create multiple result rows."""
         return self.api.create_results_bulk([dict(payload) for payload in payloads])
 
+    def create_or_update_results_bulk(self, payloads: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+        """Create missing result rows and patch existing ones."""
+        return self.api.create_or_update_results_bulk([dict(payload) for payload in payloads])
+
     def update_result(self, result_id: int, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         """Patch a single result row."""
         return self.api.update_result(result_id, dict(payload))

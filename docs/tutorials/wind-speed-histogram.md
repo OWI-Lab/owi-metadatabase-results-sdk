@@ -1,9 +1,10 @@
-# Lifetime Design Frequencies Workflow
+# Wind Speed Histogram Workflow
 
 !!! example
-    This tutorial walks through the complete `LifetimeDesignFrequencies` lifecycle:
-    import workbook data, upload results to the backend, retrieve them, and render
-    interactive plots — all as explicit, auditable steps.
+    This tutorial walks through the complete `WindSpeedHistogram` lifecycle:
+    load histogram data from a workbook, upload results to the backend,
+    retrieve them, and render an interactive histogram plot — all as explicit,
+auditable steps.
 
 ## Prerequisites
 
@@ -33,11 +34,10 @@ import datetime
 from pathlib import Path
 
 import pandas as pd
-from IPython.display import display
 from owi.metadatabase.geometry.io import GeometryAPI
 from owi.metadatabase.locations.io import LocationsAPI
 
-from owi.metadatabase.results import LifetimeDesignFrequencies, ResultsAPI
+from owi.metadatabase.results import ResultsAPI, WindSpeedHistogram
 from owi.metadatabase.results.models import AnalysisDefinition
 from owi.metadatabase.results.serializers import (
     DjangoAnalysisSerializer,
@@ -72,9 +72,8 @@ UPLOAD_RESULTS = True
 
 ## Step 3 — Resolve Project and Location Metadata
 
-Before reading the workbook, resolve the backend ids for the target
-project site, model definition, asset locations, and any existing
-analysis for the chosen timestamp.
+Before reading the workbook, resolve the backend identifiers for the
+target project site, model definition, and asset locations.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -108,7 +107,7 @@ graph TD
 locations_api = LocationsAPI(api_root=BASE_URL, token=TOKEN)
 geometry_api = GeometryAPI(api_root=BASE_URL, token=TOKEN)
 results_api = ResultsAPI(api_root=BASE_URL, token=TOKEN)
-analysis = LifetimeDesignFrequencies()
+analysis = WindSpeedHistogram()
 analysis_serializer = DjangoAnalysisSerializer()
 result_serializer = DjangoResultSerializer()
 results_service = ResultsService(
@@ -159,8 +158,8 @@ existing_analysis_id = (
 
 ## Step 4 — Load and Inspect the Workbook Data
 
-Read the Excel sheet and identify the frequency columns (those ending
-with `[Hz]`) that will feed the analysis workflow.
+Read the Excel sheet and identify the histogram bin columns (those
+starting with `[`) that define the wind speed bins.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -171,9 +170,9 @@ with `[Hz]`) that will feed the analysis workflow.
 }}}%%
 graph TD
     A["Workbook sheet"] --> B["Read Excel data"]
-    B --> C["frequency_frame"]
-    C --> D["Detect metric columns"]
-    D --> E["metric_columns"]
+    B --> C["histogram_frame"]
+    C --> D["Detect histogram bin columns"]
+    D --> E["bin_columns"]
     C --> F["Workbook preview"]
     E --> G["Workbook data ready"]
     F --> G
@@ -188,24 +187,36 @@ graph TD
 ```
 
 ```python
-sheet_name = "Lifetime -  Design frequencies"
-frequency_frame = pd.read_excel(WORKBOOK, sheet_name=sheet_name)
+import re
 
-# Detect columns like "FA1 [Hz]", "SS1 [Hz]" and strip the unit suffix.
-metric_columns = {
-    str(col).replace(" [Hz]", ""): col
-    for col in frequency_frame.columns
-    if isinstance(col, str) and col.endswith(" [Hz]")
-}
+def _parse_bin_edges(label: str) -> tuple[float, float]:
+    """Extract left and right edges from a bin label like '[0,1['."""
+    numbers = [
+        float(v) for v in re.findall(r"-?\d+(?:\.\d+)?", label)
+    ]
+    if len(numbers) < 2:
+        raise ValueError(
+            f"Could not parse histogram bin edges from {label!r}."
+        )
+    return numbers[0], numbers[1]
+
+sheet_name = "Lifetime - Wind Histogram"
+histogram_frame = pd.read_excel(
+    WORKBOOK, sheet_name=sheet_name, header=1
+)
+bin_columns = [
+    col for col in histogram_frame.columns
+    if isinstance(col, str) and col.startswith("[")
+]
 ```
 
 ---
 
 ## Step 5 — Build and Upload the Shared Analysis
 
-Build the shared analysis payload, prepare the workbook rows as typed
-result series, serialize the payloads, and persist them through
-`ResultsAPI`.
+Build the shared analysis payload, prepare each workbook row as a typed
+histogram result series with parsed bin edges, serialize the payloads,
+and persist them through `ResultsAPI`.
 
 When `CREATE_NEW_ANALYSIS` is `True`, a new analysis row is created.
 When `False`, the existing timestamped analysis is reused. The same
@@ -224,23 +235,24 @@ graph TD
     B -- no --> D["Reuse the existing analysis id"]
     C --> E["Selected analysis id"]
     D --> E
-    E --> F["Build prepared_rows and result_series"]
-    F --> G["Serialize result payloads"]
-    G --> H{"Upload result rows?"}
-    H -- yes --> I["Bulk create or update location rows"]
-    H -- no --> J["Skip writes"]
-    I --> K["Upload summary"]
-    J --> K
+    E --> F["Parse bins and build prepared_rows"]
+    F --> G["Create result_series"]
+    G --> H["Serialize result payloads"]
+    H --> I{"Upload result rows?"}
+    I -- yes --> J["Bulk create or update histogram rows"]
+    I -- no --> K["Skip writes"]
+    J --> L["Upload summary"]
+    K --> L
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
     classDef decision fill:#F7D9D1,stroke:#C04A2F,color:#5A1F14;
 
-    class C,I api;
-    class D,E,K keep;
-    class A,F,G,J build;
-    class B,H decision;
+    class C,J api;
+    class D,E,L keep;
+    class A,F,G,H,K build;
+    class B,I decision;
 ```
 
 ```python
@@ -252,7 +264,7 @@ analysis_definition = AnalysisDefinition(
     source_type="json",
     source=str(WORKBOOK),
     timestamp=ANALYSIS_TIMESTAMP,
-    description="Shared lifetime design frequencies upload.",
+    description="Shared wind speed histogram upload.",
     additional_data={
         "input_file": WORKBOOK.name,
         "sheet_name": sheet_name,
@@ -267,21 +279,27 @@ if CREATE_NEW_ANALYSIS:
 else:
     analysis_id = existing_analysis_id
 
-# -- Prepare rows and convert to typed ResultSeries
+# -- Prepare rows with parsed bin edges and scope-dependent location ids
 prepared_rows = [
     {
-        "turbine": str(row["Turbine"]),
-        "reference": str(row["Reference"]),
+        "title": str(row["Title"]),
+        "description": row.get("Description"),
+        "scope_label": str(row["Scope"]).strip(),
         "site_id": site_id,
-        "location_id": location_title_to_id_map.get(str(row["Turbine"])),
-        **{
-            metric: row.get(source_column)
-            for metric, source_column in metric_columns.items()
-        },
+        "location_id": (
+            None
+            if str(row["Scope"]).strip() == "Site"
+            else location_title_to_id_map.get(
+                str(row["Scope"]).strip()
+            )
+        ),
+        "bins": [_parse_bin_edges(str(col)) for col in bin_columns],
+        "values": [float(row[col]) for col in bin_columns],
+        "metadata": {"sheet_scope": str(row["Scope"]).strip()},
     }
-    for row in frequency_frame.to_dict(orient="records")
+    for row in histogram_frame.to_dict(orient="records")
 ]
-result_series = analysis.to_results({"rows": prepared_rows})
+result_series = analysis.to_results({"series": prepared_rows})
 
 # -- Serialize and upload
 results_payloads = [
@@ -299,7 +317,7 @@ if UPLOAD_RESULTS:
 ## Step 6 — Retrieve and Reconstruct
 
 Read the persisted result rows back from the API and reconstruct the
-normalized analysis frame.
+normalized histogram dataframe.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -312,7 +330,7 @@ graph TD
     A["Selected analysis id"] --> B["Read saved result rows"]
     B --> C["Raw backend table"]
     C --> D["Convert rows back to result series"]
-    D --> E["Rebuild the lifetime design dataframe"]
+    D --> E["Rebuild the histogram dataframe"]
     E --> F["Retrieved dataframe ready"]
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
@@ -340,13 +358,11 @@ print(retrieved_frame.head())
 
 ## Step 7 — Plot the Results
 
-The `ResultsService` provides three plot types for this analysis:
+The `ResultsService` provides a histogram plot type for this analysis.
 
 | Plot type | Visualization |
 |-----------|---------------|
-| `comparison` | Metrics across references with a location dropdown. |
-| `location` | Values grouped by turbine with a metric dropdown. |
-| `geo` | Results projected onto a geographic site map. |
+| `histogram` | Bin distribution for each series, with site or turbine scope. |
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -356,50 +372,30 @@ The `ResultsService` provides three plot types for this analysis:
   'clusterBorder': '#CBD5E1'
 }}}%%
 graph TD
-    A["Selected analysis id"] --> B["Create comparison plot"]
-    A --> C["Create location plot"]
-    A --> D["Create geo plot"]
-    B --> E["Comparison widget"]
-    C --> F["Location widget"]
-    D --> G["Geo widget"]
-    E --> H["Display plots"]
-    F --> H
-    G --> H
+    A["Selected analysis id"] --> B["Create histogram plot"]
+    B --> C["Histogram widget"]
+    C --> D["Display plot"]
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
 
-    class B,C,D api;
-    class E,F,G,H keep;
+    class B api;
+    class C,D keep;
     class A build;
 ```
 
 ```python
 filters = {"analysis_id": analysis_id}
 
-comparison_plot = results_service.plot_results(
+histogram_plot = results_service.plot_results(
     analysis.analysis_name,
     filters=filters,
-    plot_type="comparison",
-)
-
-location_plot = results_service.plot_results(
-    analysis.analysis_name,
-    filters=filters,
-    plot_type="location",
-)
-
-geo_plot = results_service.plot_results(
-    analysis.analysis_name,
-    filters=filters,
-    plot_type="geo",
+    plot_type="histogram",
 )
 
 # Display in a notebook environment.
-display(comparison_plot.notebook)
-display(location_plot.notebook)
-display(geo_plot.notebook)
+display(histogram_plot.notebook)
 ```
 
 ---
@@ -407,19 +403,19 @@ display(geo_plot.notebook)
 ## What You Learned
 
 - How to resolve project metadata through `LocationsAPI` and `GeometryAPI`.
-- How to prepare workbook data and serialize it into backend-compatible
-  payloads using `AnalysisDefinition` and `DjangoResultSerializer`.
+- How to parse histogram bin labels into numeric edge pairs.
+- How to prepare histogram data with scope-dependent location ids and
+  serialize it into backend-compatible payloads.
 - How to conditionally create or reuse analyses and upload result rows
   with `create_or_update_results_bulk`.
-- How to retrieve and reconstruct typed result series from persisted data.
-- How to render comparison, location, and geo plots through
-  `ResultsService`.
+- How to retrieve and reconstruct typed histogram series from persisted data.
+- How to render histogram plots through `ResultsService`.
 
 ## Next Steps
 
+- [Lifetime Design Frequencies Workflow](lifetime-design-frequencies.md) —
+  the upload-retrieve-plot cycle for design frequency data.
 - [Lifetime Design Verification Workflow](lifetime-design-verification.md) —
-  the same upload-retrieve-plot cycle for design verification data.
+  the same cycle for design verification data.
 - [Reference: Analysis Queries](../reference/query-examples/analyses.md) —
   Django ORM examples for the `Analysis` model.
-- [Explanation: Architecture](../explanation/architecture.md) —
-  understand the design patterns behind the SDK.

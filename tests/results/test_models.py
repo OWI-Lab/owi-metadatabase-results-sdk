@@ -5,14 +5,16 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from owi.metadatabase.results import ResultQuery, ResultSeries, ResultVector
 from owi.metadatabase.results.models import (
     AnalysisDefinition,
     AnalysisKind,
     PlotRequest,
     RelatedObject,
+    ResultQuery,
     ResultRecordPayload,
     ResultScope,
+    ResultSeries,
+    ResultVector,
 )
 
 

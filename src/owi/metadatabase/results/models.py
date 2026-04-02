@@ -149,6 +149,7 @@ class AnalysisRecordPayload(BaseModel):
     source: str | None = None
     description: str | None = None
     user: str | None = None
+    timestamp: datetime | None = None
     additional_data: dict[str, Any] = Field(default_factory=dict)
 
 
