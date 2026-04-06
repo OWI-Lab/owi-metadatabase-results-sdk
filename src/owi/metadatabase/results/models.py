@@ -252,3 +252,4 @@ class PlotResponse(BaseModel):
     notebook: Any | None = None
     html: str
     json_options: str
+    frontend_spec: dict[str, Any] | None = None
