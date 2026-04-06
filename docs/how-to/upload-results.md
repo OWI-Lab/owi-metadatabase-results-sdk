@@ -74,3 +74,36 @@ turbine name could not be mapped to a backend location id:
 upload_payloads = [p for p in payloads if p.get("location") is not None]
 api.create_results_bulk(upload_payloads)
 ```
+
+## Create or Update Results in Bulk
+
+When re-uploading data that may partially overlap with existing backend
+rows, use `create_or_update_results_bulk`. The method matches rows within
+the same analysis by their `short_description` and either creates or
+patches each one accordingly.
+
+Every payload **must** include both `analysis` (the analysis id) and
+`short_description` keys:
+
+```python
+payloads = [
+    {"analysis": analysis_id, "short_description": "BBA01 - FA1", "name_col1": "frequency", ...},
+    {"analysis": analysis_id, "short_description": "BBA02 - FA1", "name_col1": "frequency", ...},
+]
+
+result = api.create_or_update_results_bulk(payloads)
+print(result["summary"])  # list of {analysis, short_description, result_id, action}
+```
+
+The returned `summary` list indicates the `action` taken for each row:
+
+| Action | Meaning |
+|--------|---------|
+| `created` | No matching row existed; a new row was inserted. |
+| `updated` | An existing row with the same `short_description` was patched. |
+
+!!! warning "Ambiguous matches"
+    If the backend already contains **multiple** rows with the same
+    `short_description` for a given analysis, the call raises
+    `InvalidParameterError` to avoid silent data corruption.
+    Resolve the duplicates on the backend first, then retry.

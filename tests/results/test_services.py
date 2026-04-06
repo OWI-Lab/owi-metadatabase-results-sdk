@@ -8,10 +8,11 @@ from typing import Any
 
 import pandas as pd
 
-from owi.metadatabase.results import LifetimeDesignFrequencies, ResultsService, WindSpeedHistogram
+from owi.metadatabase.results import LifetimeDesignFrequencies, WindSpeedHistogram
 from owi.metadatabase.results.analyses.lifetime_design_verification import LifetimeDesignVerification
 from owi.metadatabase.results.models import ResultQuery
 from owi.metadatabase.results.serializers import DjangoResultSerializer
+from owi.metadatabase.results.services import ResultsService
 from owi.metadatabase.results.services import get_results as module_get_results
 from owi.metadatabase.results.services import plot_results as module_plot_results
 
@@ -35,6 +36,9 @@ class StubRepository:
         return {"item": payload}
 
     def create_results_bulk(self, payloads: Any) -> dict[str, Any]:
+        return {"items": list(payloads)}
+
+    def create_or_update_results_bulk(self, payloads: Any) -> dict[str, Any]:
         return {"items": list(payloads)}
 
     def update_result(self, result_id: int, payload: Any) -> dict[str, Any]:

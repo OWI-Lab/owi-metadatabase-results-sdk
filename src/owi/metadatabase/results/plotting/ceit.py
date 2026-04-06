@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import Any, cast
 
 import pandas as pd
@@ -20,14 +19,18 @@ from .theme import (
     _yaxis_opts,
 )
 
+REQUIRED_CEIT_COLUMNS = {"sensor_identifier", "timestamp", "metric", "value"}
 
-def plot_ceit_analyses(data: pd.DataFrame | Sequence[Any]) -> Any:
-    """Plot CEIT sensor measurements with a dropdown that switches sensors."""
-    from ..analyses.ceit import ceit_frame_from_measurements
 
-    frame = ceit_frame_from_measurements(data) if not isinstance(data, pd.DataFrame) else data.copy()
+def plot_ceit_analyses(data: pd.DataFrame) -> Any:
+    """Plot processed CEIT sensor measurements with a sensor dropdown."""
+    frame = data.copy()
     if frame.empty:
         raise ValueError("No CEIT measurements are available to plot.")
+    missing_columns = REQUIRED_CEIT_COLUMNS.difference(frame.columns)
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise ValueError(f"CEIT plot data is missing required columns: {missing}.")
     charts: dict[str, Line] = {}
     for sensor_identifier, sensor_frame in frame.groupby("sensor_identifier"):
         chart = Line(init_opts=opts.InitOpts(width="100%", height="420px"))

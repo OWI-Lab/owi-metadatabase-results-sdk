@@ -280,6 +280,84 @@ def test_create_results_bulk_raises_on_server_error() -> None:
         api.create_results_bulk([{"analysis": 1}])
 
 
+def test_create_or_update_results_bulk_creates_missing_and_updates_existing() -> None:
+    api = ResultsAPI(token="dummy")
+    payloads = [
+        {"analysis": 10, "short_description": "existing", "name_col1": "timestamp"},
+        {"analysis": 10, "short_description": "new", "name_col1": "timestamp"},
+    ]
+    existing_rows = pd.DataFrame(
+        [
+            {"id": 7, "analysis": 10, "short_description": "existing"},
+        ]
+    )
+    created_rows = pd.DataFrame(
+        [
+            {"id": 9, "analysis": 10, "short_description": "new"},
+        ]
+    )
+    updated_rows = pd.DataFrame(
+        [
+            {"id": 7, "analysis": 10, "short_description": "existing"},
+        ]
+    )
+
+    with (
+        patch.object(ResultsAPI, "list_results", return_value={"data": existing_rows, "exists": True}) as list_mock,
+        patch.object(
+            ResultsAPI,
+            "create_results_bulk",
+            return_value={"data": created_rows, "exists": True, "response": None},
+        ) as create_mock,
+        patch.object(
+            ResultsAPI,
+            "update_result",
+            return_value={"data": updated_rows, "exists": True, "id": 7, "response": None},
+        ) as update_mock,
+    ):
+        result = api.create_or_update_results_bulk(payloads)
+
+    list_mock.assert_called_once_with(analysis=10)
+    create_mock.assert_called_once_with([payloads[1]])
+    update_mock.assert_called_once_with(7, payloads[0])
+    assert result["exists"] is True
+    assert result["summary"] == [
+        {"analysis": 10, "short_description": "existing", "result_id": 7, "action": "updated"},
+        {"analysis": 10, "short_description": "new", "result_id": 9, "action": "created"},
+    ]
+    assert sorted(result["data"]["id"].tolist()) == [7, 9]
+
+
+def test_create_or_update_results_bulk_requires_analysis_and_short_description() -> None:
+    api = ResultsAPI(token="dummy")
+
+    with pytest.raises(InvalidParameterError, match="analysis"):
+        api.create_or_update_results_bulk([{"short_description": "series"}])
+
+    with pytest.raises(InvalidParameterError, match="short_description"):
+        api.create_or_update_results_bulk([{"analysis": 1}])
+
+
+def test_create_or_update_results_bulk_raises_on_ambiguous_existing_results() -> None:
+    api = ResultsAPI(token="dummy")
+    existing_rows = pd.DataFrame(
+        [
+            {"id": 7, "analysis": 10, "short_description": "existing"},
+            {"id": 8, "analysis": 10, "short_description": "existing"},
+        ]
+    )
+
+    with (
+        patch.object(ResultsAPI, "list_results", return_value={"data": existing_rows, "exists": True}),
+        pytest.raises(InvalidParameterError, match="short_description"),
+    ):
+        api.create_or_update_results_bulk(
+            [
+                {"analysis": 10, "short_description": "existing", "name_col1": "timestamp"},
+            ]
+        )
+
+
 def test_create_results_bulk_falls_back_on_500() -> None:
     api = ResultsAPI(token="dummy")
 

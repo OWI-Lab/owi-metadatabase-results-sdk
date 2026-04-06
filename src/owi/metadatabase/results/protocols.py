@@ -109,6 +109,9 @@ class ResultsRepositoryProtocol(Protocol):
     def create_results_bulk(self, payloads: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
         """Create multiple result records."""
 
+    def create_or_update_results_bulk(self, payloads: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+        """Create missing result records and patch existing ones."""
+
     def update_result(self, result_id: int, payload: Mapping[str, Any]) -> Mapping[str, Any]:
         """Patch a single result record."""
 

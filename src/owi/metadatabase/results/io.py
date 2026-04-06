@@ -12,6 +12,7 @@ True
 
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping, Sequence
 from typing import Any
 from urllib.parse import urlparse
@@ -82,12 +83,56 @@ class ResultsAPI(API):
         return {"data": df, "exists": info["existance"], "response": info.get("response")}
 
     def get_analysis(self, **kwargs: Any) -> dict[str, Any]:
-        """Return a single analysis row."""
+        """Return a single analysis row.
+        To make sure a single analysis is returned, use either the `id` parameter,
+        or, for a more user-friendly query, the following combination of parameters
+        that identify a single analysis, i.e., `name`, `model_definition__title`,
+        `timestamp`, and `location__title`, since they uniquely identify an
+        analysis in the backend.
+
+        Examples
+        --------
+        >>> from unittest.mock import patch
+        >>> api = ResultsAPI(token="dummy")
+        >>> result = (pd.DataFrame({'id': [1]}), {'existance': True, 'id': 1})
+        >>> with patch.object(ResultsAPI, 'process_data', return_value=result):
+        ...     out = api.get_analysis(id=1)
+        >>> out['exists']
+        True
+        >>> out['id']
+        1
+
+        >>> api = ResultsAPI(token="dummy")  # doctest: SKIP
+        >>> analysis_params = {  # doctest: SKIP
+        ...     'analysis__name': 'WindSpeedHistogram',  # doctest: SKIP
+        ...     'model_definition__title': 'ERA5 reanalysis',  # doctest: SKIP
+        ...     'timestamp': '2023-01-01T00:00:00Z',  # doctest: SKIP
+        ...     'location__title': 'Test Location',  # doctest: SKIP
+        ... }  # doctest: SKIP
+        """
+        if "timestamp" in kwargs and isinstance(kwargs["timestamp"], datetime.datetime):
+            kwargs["timestamp"] = kwargs["timestamp"].isoformat()
         df, info = self.process_data(self.endpoints.analysis, kwargs, "single")
         return {"data": df, "exists": info["existance"], "id": info["id"], "response": info.get("response")}
 
     def list_results(self, **kwargs: Any) -> dict[str, Any]:
-        """Return raw result rows from the backend."""
+        """Return raw result rows from the backend.
+
+        To return all the results related to a specific analysis, use on of the
+        following:
+        * `analysis` or `analysis__id` parameter with the analysis ID.
+        * `analysis__name`, `analysis__model_definition__title`,
+          `analysis__timestamp`, and `analysis__location__title` parameters
+          because this identifies a single analysis (see `get_analysis`).
+
+        Examples
+        --------
+        >>> from owi.metadatabase.results import ResultsAPI  # doctest: SKIP
+        >>> api = ResultsAPI(token="dummy")  # doctest: SKIP
+        >>> results = api.list_results(analysis__id=1)  # doctest: SKIP
+        >>> results['exists']  # doctest: SKIP
+        True  # doctest: SKIP
+        """
         url_params = dict(kwargs)
         if "analysis" in url_params and "analysis__id" not in url_params:
             url_params["analysis__id"] = url_params.pop("analysis")
@@ -123,7 +168,9 @@ class ResultsAPI(API):
         else:
             raise InvalidParameterError("Either header or username/password authentication must be configured.")
         if response.status_code not in {200, 201}:
-            raise APIConnectionError(message=f"Error {response.status_code}.\n{response.reason}", response=response)
+            details = f"\n{response.text}" if response.text else ""
+            message = f"Error {response.status_code}.\n{response.reason}{details}"
+            raise APIConnectionError(message=message, response=response)
         return response
 
     def _send_json_request(self, endpoint: str, payload: Any, method: str = "post") -> requests.Response:
@@ -158,6 +205,8 @@ class ResultsAPI(API):
         normalized.setdefault("location", None)
         if "model_definition" not in normalized and normalized.get("model_definition_id") is not None:
             normalized["model_definition"] = normalized["model_definition_id"]
+        if "timestamp" in normalized and normalized["timestamp"] is not None:
+            normalized["timestamp"] = normalized["timestamp"].isoformat()
 
         source = normalized.get("source")
         if isinstance(source, str):
@@ -237,3 +286,108 @@ class ResultsAPI(API):
                 progress.update(1)
         df = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
         return {"data": df, "exists": not df.empty, "response": None}
+
+    def create_or_update_results_bulk(self, payloads: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+        """Create missing result rows and patch existing ones in bulk.
+
+        Existing rows are matched within the same analysis using the
+        `short_description` field of each payload.
+
+        If duplicate `short_description` values are found for the same result (row) in the backend,
+        the method will raise an error to avoid ambiguity in the update process.
+        In this case, the user should first resolve the duplicates in the backend, e.g. by
+        renaming the `short_description` values, and then retry the bulk create or update operation.
+        """
+        serialized_payloads = [dict(payload) for payload in payloads]
+        if not serialized_payloads:
+            return {"data": pd.DataFrame(), "exists": False, "response": None, "summary": []}
+
+        grouped_payloads: dict[int, list[dict[str, Any]]] = {}
+        for payload in serialized_payloads:
+            analysis_id = payload.get("analysis")
+            short_description = payload.get("short_description")
+            if analysis_id is None:
+                raise InvalidParameterError("bulk create or update requires an `analysis` value for each payload.")
+            if short_description is None:
+                raise InvalidParameterError(
+                    "bulk create or update requires a `short_description` value for each payload."
+                )
+            grouped_payloads.setdefault(int(analysis_id), []).append(payload)
+
+        create_payloads: list[dict[str, Any]] = []
+        update_requests: list[tuple[int, dict[str, Any]]] = []
+        summary_by_key: dict[tuple[int, str], dict[str, Any]] = {}
+
+        for analysis_id, analysis_payloads in grouped_payloads.items():
+            existing_rows = self.list_results(analysis=analysis_id)["data"]
+            existing_ids_by_description: dict[str, int] = {}
+
+            if not existing_rows.empty and "short_description" in existing_rows.columns:
+                requested_descriptions = [str(payload["short_description"]) for payload in analysis_payloads]
+                relevant_rows = existing_rows.loc[
+                    existing_rows["short_description"].astype(str).isin(requested_descriptions)
+                ].copy()
+                duplicate_counts = relevant_rows["short_description"].astype(str).value_counts()
+                ambiguous_descriptions = duplicate_counts[duplicate_counts > 1]
+                if not ambiguous_descriptions.empty:
+                    duplicates = ", ".join(sorted(ambiguous_descriptions.index.tolist()))
+                    raise InvalidParameterError(
+                        "bulk create or update found multiple existing results for the same "
+                        f"`short_description`: {duplicates}."
+                    )
+
+                existing_ids_by_description = {
+                    str(row["short_description"]): int(row["id"])
+                    for row in relevant_rows.to_dict(orient="records")
+                    if row.get("id") is not None and row.get("short_description") is not None
+                }
+
+            for payload in analysis_payloads:
+                identity = (analysis_id, str(payload["short_description"]))
+                existing_id = existing_ids_by_description.get(identity[1])
+                if existing_id is None:
+                    create_payloads.append(payload)
+                else:
+                    update_requests.append((existing_id, payload))
+                    summary_by_key[identity] = {
+                        "analysis": analysis_id,
+                        "short_description": identity[1],
+                        "result_id": existing_id,
+                        "action": "updated",
+                    }
+
+        frames: list[pd.DataFrame] = []
+        if create_payloads:
+            create_result = self.create_results_bulk(create_payloads)
+            if not create_result["data"].empty:
+                frames.append(create_result["data"])
+            created_ids_by_key = {
+                (int(row["analysis"]), str(row["short_description"])): int(row["id"])
+                for row in create_result["data"].to_dict(orient="records")
+                if row.get("id") is not None
+                and row.get("analysis") is not None
+                and row.get("short_description") is not None
+            }
+            for payload in create_payloads:
+                identity = (int(payload["analysis"]), str(payload["short_description"]))
+                summary_by_key[identity] = {
+                    "analysis": identity[0],
+                    "short_description": identity[1],
+                    "result_id": created_ids_by_key.get(identity),
+                    "action": "created",
+                }
+
+        if update_requests:
+            with tqdm(total=len(update_requests), desc="Uploading existing result rows", unit="row") as progress:
+                for result_id, payload in update_requests:
+                    updated = self.update_result(result_id, payload)
+                    if not updated["data"].empty:
+                        frames.append(updated["data"])
+                    progress.update(1)
+
+        df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        summary = [
+            summary_by_key[(int(payload["analysis"]), str(payload["short_description"]))]
+            for payload in serialized_payloads
+        ]
+        return {"data": df, "exists": not df.empty, "response": None, "summary": summary}

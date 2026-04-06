@@ -2,8 +2,7 @@
 
 import pytest
 
-from owi.metadatabase.results import default_registry
-from owi.metadatabase.results.registry import AnalysisRegistry
+from owi.metadatabase.results.registry import AnalysisRegistry, default_registry
 
 
 def test_registry_contains_built_in_analyses() -> None:

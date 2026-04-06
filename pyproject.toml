@@ -1,6 +1,6 @@
 [project]
 name = "owi-metadatabase-results"
-version = "0.1.2"
+version = "0.2.0"
 description = "Results extension for OWI Metadatabase SDK"
 authors = [
     { name = "Pietro D'Antuono", email = "pietro.dantuono@vub.be" }
@@ -31,7 +31,7 @@ classifiers = [
 dependencies = [
     "ipython >= 8.0.0",
     "ipywidgets >= 8.1.0",
-    "owi-metadatabase >= 0.1.2",
+    "owi-metadatabase >= 0.1.7",
     "pandas >= 2.2.0",
     "pydantic >= 2.11.0",
     "pyecharts >= 2.0.8",
@@ -53,6 +53,7 @@ dev = [
     {include-group = "docs"},
     {include-group = "dev-tools"},
     {include-group = "scripts"},
+    {include-group = "metadatabase-extras"}
 ]
 test = [
     "pytest >=8.4.0",
@@ -75,6 +76,7 @@ typing = [
 scripts = [
     "openpyxl>=3.1.5",
     "rich>=14.1.0",
+    "ipykernel >= 6.0.0"
 ]
 docs = [
     "zensical >=0.0.28 ; python_version >= '3.10'",
@@ -85,7 +87,10 @@ dev-tools = [
     "bump2version>=1.0.1",
     "invoke>=2.2.0",
     "pre-commit>=3.0.0",
-    "deptry >=0.23.1"
+    "deptry >=0.23.1",
+]
+metadatabase-extras = [
+    "owi-metadatabase-shm"
 ]
 
 [project.urls]

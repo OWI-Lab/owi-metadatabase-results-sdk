@@ -15,6 +15,9 @@ nav = [
     { "Overview" = "tutorials/index.md" },
     { "Your First Results Query" = "tutorials/first-query.md" },
     { "Lifetime Design Frequencies Workflow" = "tutorials/lifetime-design-frequencies.md" },
+    { "Lifetime Design Verification Workflow" = "tutorials/lifetime-design-verification.md" },
+    { "Wind Speed Histogram Workflow" = "tutorials/wind-speed-histogram.md" },
+    { "CEIT Corrosion Monitoring Workflow" = "tutorials/ceit-corrosion-monitoring.md" },
   ]},
   { "How-to Guides" = [
     { "Overview" = "how-to/index.md" },

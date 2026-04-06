@@ -37,6 +37,9 @@ class StubRepository:
     def create_results_bulk(self, payloads: Any) -> dict[str, Any]:
         return {"items": list(payloads)}
 
+    def create_or_update_results_bulk(self, payloads: Any) -> dict[str, Any]:
+        return {"items": list(payloads)}
+
     def update_result(self, result_id: int, payload: Any) -> dict[str, Any]:
         return {"id": result_id, "item": payload}
 

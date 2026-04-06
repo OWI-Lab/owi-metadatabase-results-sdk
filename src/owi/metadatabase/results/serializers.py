@@ -61,6 +61,7 @@ class DjangoAnalysisSerializer:
             source=obj.source,
             description=obj.description,
             user=obj.user,
+            timestamp=obj.timestamp,
             additional_data=obj.additional_data,
         )
         return payload.model_dump(exclude_none=True)

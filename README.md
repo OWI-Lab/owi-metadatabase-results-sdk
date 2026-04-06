@@ -8,6 +8,7 @@ Results extension for OWI Metadatabase SDK
 [![pytest](https://img.shields.io/github/actions/workflow/status/owi-lab/owi-metadatabase-results-sdk/ci.yml?label=pytest)](https://github.com/OWI-Lab/owi-metadatabase-results-sdk/actions/workflows/ci.yml)
 [![lint](https://img.shields.io/github/actions/workflow/status/owi-lab/owi-metadatabase-results-sdk/ci.yml?label=lint)](https://github.com/OWI-Lab/owi-metadatabase-results-sdk/actions/workflows/ci.yml)
 [![issues](https://img.shields.io/github/issues/owi-lab/owi-metadatabase-results-sdk)](https://github.com/OWI-Lab/owi-metadatabase-results-sdk/issues)
+![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen)
 [![Documentation](https://img.shields.io/badge/docs-zensical-blue)](https://owi-lab.github.io/owi-metadatabase-results-sdk/)
 
 ## Overview
@@ -55,52 +56,62 @@ print(api.ping())
 
 ## Architecture At A Glance
 
-The diagram below shows how the package is structured, which parts are core, and how data moves from domain payloads to backend persistence and plots.
+The diagram below shows how the package is structured, which parts are core, and how data moves from domain payloads to backend persistence and plots. Colour legend: <span style="color:#2c7a4b">**green**</span> = core orchestration, <span style="color:#3559b7">**blue**</span> = domain models and analyses, <span style="color:#b7791f">**amber**</span> = infrastructure / HTTP, <span style="color:#d97706">**yellow**</span> = protocol contracts, <span style="color:#6b7280">**grey**</span> = external packages.
 
 ```mermaid
 flowchart TD
-  User[User Code / Notebooks / Scripts] --> Service[services.py\nResultsService\nHigh-level facade]
+  User[User Code / Notebooks / Scripts] --> Service[services/core.py\nResultsService\nHigh-level facade]
   User --> API[io.py\nResultsAPI\nLow-level HTTP client]
 
-  Service --> Repo[services.py\nApiResultsRepository]
+  Service --> Repo[services/core.py\nApiResultsRepository]
   Repo --> API
+  API -. routes .-> Endpoints[endpoints.py\nResultsEndpoints]
 
-  Service --> Registry[registry.py\nAnalysis registry]
-  Registry --> BaseAnalysis[analyses/base.py\nShared analysis contract]
+  Service --> Serializers[serializers.py\nDjangoAnalysisSerializer\nDjangoResultSerializer]
+  Service --> Registry[registry.py\nAnalysisRegistry]
+  Serializers --> Models
+
+  Registry --> BaseAnalysis[analyses/base.py\nBaseAnalysis mixin]
 
   BaseAnalysis --> Freq[analyses/lifetime_design_frequencies.py\nComparison + location + geo frequencies]
   BaseAnalysis --> Verify[analyses/lifetime_design_verification.py\nTime-series verification]
   BaseAnalysis --> Hist[analyses/wind_speed_histogram.py\nHistogram analysis]
-  BaseAnalysis --> CEIT[ceit.py\nCEIT import + merge + plot helpers]
+  BaseAnalysis --> CEIT[analyses/ceit.py\nCEIT corrosion monitoring]
 
-  Freq --> Models[models.py\nAnalysisDefinition\nResultSeries\nResultVector\nResultQuery\nPlotRequest/Response]
+  Freq --> Models[models.py\nAnalysisDefinition · ResultSeries\nResultVector · ResultQuery\nPlotRequest · PlotResponse]
   Verify --> Models
   Hist --> Models
   CEIT --> Models
 
-  Models --> Serializers[serializers.py\nDjango payload mapping]
-  Serializers --> API
+  Protocols[protocols.py\nAnalysisProtocol · PlotStrategyProtocol\nResultsRepositoryProtocol\nSerializerProtocol] -. structural contracts .-> Service
+  Protocols -. structural contracts .-> BaseAnalysis
+  Protocols -. structural contracts .-> Repo
 
-  Service --> Plotting[plotting.py\nGeneric histogram/time-series rendering]
-  Freq --> FrequencyPlots[frequency_plots.py\nSpecialized comparison/location/geo plots]
-  Plotting --> PlotResponse[PlotResponse\nHTML + notebook widget + chart options]
-  FrequencyPlots --> PlotResponse
+  BaseAnalysis --> GenericPlots[plotting/strategies.py\nHistogramPlotStrategy\nTimeSeriesPlotStrategy]
+  Freq --> FreqPlots[plotting/frequency.py\nComparison / location / geo plots]
+  Verify --> VerifyPlots[plotting/verification.py\nTime-series metric charts]
+  CEIT --> CeitPlots[plotting/ceit.py\nSensor dropdown charts]
 
-  Service -. location metadata for geo plots .-> Locations[owi.metadatabase.locations.io\nLocationsAPI]
-  Locations -. coordinates and titles .-> FrequencyPlots
-  Locations -. asset/site identifiers .-> Repo
+  GenericPlots --> PlotWidgets[plotting/response.py + theme.py\nDropdown builders + monospace theme]
+  FreqPlots --> PlotWidgets
+  VerifyPlots --> PlotWidgets
+  CeitPlots --> PlotWidgets
 
-  Geometry[owi.metadatabase.geometry\nOWT / subassembly context] -. joined by site/location identifiers .-> User
+  Repo -. location metadata .-> Locations[owi.metadatabase.locations\nLocationsAPI]
+  Geometry[owi.metadatabase.geometry\nOWT / subassembly context] -. joined by site/location .-> User
 
   classDef core fill:#d9f2e6,stroke:#2c7a4b,color:#143d28;
   classDef domain fill:#e8eefc,stroke:#3559b7,color:#1e2f63;
   classDef infra fill:#f7ead9,stroke:#b7791f,color:#5a3d0c;
   classDef external fill:#f3f4f6,stroke:#6b7280,color:#374151;
+  classDef contract fill:#fef3c7,stroke:#d97706,color:#78350f;
 
-  class Service,Repo,Registry,BaseAnalysis,Plotting,FrequencyPlots core;
-  class Freq,Verify,Hist,CEIT,Models,PlotResponse,Serializers domain;
-  class API infra;
+  class Service,Repo,Registry,BaseAnalysis core;
+  class GenericPlots,FreqPlots,VerifyPlots,CeitPlots,PlotWidgets core;
+  class Freq,Verify,Hist,CEIT,Models,Serializers domain;
+  class API,Endpoints infra;
   class User,Locations,Geometry external;
+  class Protocols contract;
 ```
 
 ## Data Model At A Glance
@@ -185,5 +196,5 @@ Interpretation:
 uv sync --dev
 uv run invoke test
 uv run invoke qa
-uv run invoke docs.build
+uv run invoke docs
 ```

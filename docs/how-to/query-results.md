@@ -76,7 +76,7 @@ The service layer deserializes raw backend rows into typed `ResultSeries`
 objects:
 
 ```python
-from owi.metadatabase.results import ResultsService
+from owi.metadatabase.results.services import ResultsService
 from owi.metadatabase.results.services import ApiResultsRepository
 
 service = ResultsService(repository=ApiResultsRepository(api=api))
