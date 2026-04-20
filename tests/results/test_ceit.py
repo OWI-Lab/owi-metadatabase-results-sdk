@@ -125,6 +125,16 @@ def test_frequency_dropdown_plots_include_metric_and_reference_options() -> None
     assert geo_options["FA1"]["INFL"]["legend"][0]["show"] is False
     assert geo_options["FA1"]["INFL"]["visualMap"]["precision"] == 2
     assert geo_options["FA1"]["INFL"]["geo"]["zoom"] > 0
+    assert scatter_response.frontend_spec is not None
+    assert scatter_response.frontend_spec["mode"] == "dropdown"
+    assert scatter_response.frontend_spec["controls"][0]["label"] == "Metric"
+    assert geo_response.frontend_spec is not None
+    assert geo_response.frontend_spec["mode"] == "nested_dropdown"
+    assert geo_response.frontend_spec["dependencies"] == ["echarts", "world"]
+    assert geo_response.frontend_spec["controls"][0]["label"] == "Metric"
+    assert geo_response.frontend_spec["controls"][1]["label"] == "Reference"
+    formatter = geo_response.frontend_spec["options_by_primary_key"]["FA1"]["INFL"]["tooltip"]["formatter"]
+    assert formatter.startswith("function (params)")
 
 
 class TestSanitizeJsonText:
