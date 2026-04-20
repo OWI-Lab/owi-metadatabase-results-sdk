@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from html import escape
 from typing import Any, cast
@@ -30,6 +31,139 @@ except ImportError:  # pragma: no cover - only used in notebooks.
     widgets = None
 else:
     widgets = _widgets
+
+
+def _chart_json_options(chart: ChartLike) -> str:
+    """Return serialized chart options using the most JSON-compatible dumper."""
+    dump_with_quotes = getattr(chart, "dump_options_with_quotes", None)
+    json_options = dump_with_quotes() if callable(dump_with_quotes) else chart.dump_options()
+    return cast(str, json_options)
+
+
+def _chart_option_payload(chart: ChartLike) -> dict[str, Any]:
+    """Return chart options parsed into a Python mapping."""
+    return cast(dict[str, Any], json.loads(_chart_json_options(chart)))
+
+
+def _chart_dependencies(chart: ChartLike) -> list[str]:
+    """Return stable chart dependency identifiers."""
+    return list(dict.fromkeys(getattr(chart, "js_dependencies").items))
+
+
+def _control_param_name(label: str, *, fallback: str) -> str:
+    """Convert a human-facing control label into a stable param-style identifier."""
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(label or "").strip().lower()).strip("_")
+    return normalized or fallback
+
+
+def _build_control_options(items: list[tuple[str, str]]) -> list[dict[str, str]]:
+    """Convert dropdown items into a frontend-friendly control schema."""
+    return [{"value": value, "label": label} for value, label in items]
+
+
+def _build_single_frontend_spec(chart: ChartLike) -> dict[str, Any]:
+    """Build a frontend-friendly spec for a single ECharts option payload."""
+    return {
+        "schema_version": 1,
+        "renderer": "echarts",
+        "mode": "single",
+        "height": str(getattr(chart, "height", None) or "500px"),
+        "dependencies": _chart_dependencies(chart),
+        "controls": [],
+        "option": _chart_option_payload(chart),
+    }
+
+
+def _build_dropdown_frontend_spec(
+    charts_by_key: Mapping[str, ChartLike],
+    *,
+    dropdown_label: str,
+    default_key: str,
+    height: str,
+) -> dict[str, Any]:
+    """Build a frontend-friendly spec for a single-dropdown chart selection."""
+    key_items = [(key, key) for key in charts_by_key]
+    return {
+        "schema_version": 1,
+        "renderer": "echarts",
+        "mode": "dropdown",
+        "height": height,
+        "dependencies": list(
+            dict.fromkeys(
+                dependency
+                for chart in charts_by_key.values()
+                for dependency in _chart_dependencies(chart)
+            )
+        ),
+        "controls": [
+            {
+                "label": dropdown_label,
+                "param_name": _control_param_name(dropdown_label, fallback="selection"),
+                "default_value": default_key,
+                "options": _build_control_options(key_items),
+            }
+        ],
+        "options_by_key": {
+            key: _chart_option_payload(chart)
+            for key, chart in charts_by_key.items()
+        },
+    }
+
+
+def _build_nested_frontend_spec(
+    charts_by_primary_key: Mapping[str, Mapping[str, ChartLike]],
+    *,
+    primary_label: str,
+    secondary_label: str,
+    default_primary_key: str,
+    default_secondary_key: str,
+    height: str,
+) -> dict[str, Any]:
+    """Build a frontend-friendly spec for dependent primary/secondary dropdown charts."""
+    primary_items = [(primary_key, primary_key) for primary_key in charts_by_primary_key]
+    secondary_items_by_primary = {
+        primary_key: [(secondary_key, secondary_key) for secondary_key in charts_by_secondary_key]
+        for primary_key, charts_by_secondary_key in charts_by_primary_key.items()
+    }
+    dependencies = list(
+        dict.fromkeys(
+            dependency
+            for charts_by_secondary_key in charts_by_primary_key.values()
+            for chart in charts_by_secondary_key.values()
+            for dependency in _chart_dependencies(chart)
+        )
+    )
+    return {
+        "schema_version": 1,
+        "renderer": "echarts",
+        "mode": "nested_dropdown",
+        "height": height,
+        "dependencies": dependencies,
+        "controls": [
+            {
+                "label": primary_label,
+                "param_name": _control_param_name(primary_label, fallback="primary_selection"),
+                "default_value": default_primary_key,
+                "options": _build_control_options(primary_items),
+            },
+            {
+                "label": secondary_label,
+                "param_name": _control_param_name(secondary_label, fallback="secondary_selection"),
+                "default_value": default_secondary_key,
+                "options_by_parent": {
+                    primary_key: _build_control_options(items)
+                    for primary_key, items in secondary_items_by_primary.items()
+                },
+            },
+        ],
+        "options_by_primary_key": {
+            primary_key: {
+                secondary_key: _chart_option_payload(chart)
+                for secondary_key, chart in charts_by_secondary_key.items()
+            }
+            for primary_key, charts_by_secondary_key in charts_by_primary_key.items()
+        },
+    }
 
 
 def _render_notebook(chart: ChartLike) -> Any:
@@ -494,13 +628,13 @@ def _loader_script(dependencies: list[str], callback_name: str) -> str:
 def _build_plot_response(chart: ChartLike) -> PlotResponse:
     """Build a response with both embedded HTML and notebook-native output."""
     _apply_monospace_theme(chart)
-    dump_with_quotes = getattr(chart, "dump_options_with_quotes", None)
-    json_options = dump_with_quotes() if callable(dump_with_quotes) else chart.dump_options()
+    json_options = _chart_json_options(chart)
     return PlotResponse(
         chart=chart,
         notebook=_render_notebook(chart),
         html=chart.render_embed(),
-        json_options=cast(str, json_options),
+        json_options=json_options,
+        frontend_spec=_build_single_frontend_spec(chart),
     )
 
 
@@ -632,6 +766,12 @@ def build_dropdown_plot_response(
         html=html,
         frame_height=_parse_pixel_height(height, default=420) + 90,
     )
+    frontend_spec = _build_dropdown_frontend_spec(
+        charts_by_key,
+        dropdown_label=dropdown_label,
+        default_key=selected_key,
+        height=height,
+    )
     return PlotResponse(
         chart=charts_by_key[selected_key],
         notebook=notebook,
@@ -639,13 +779,12 @@ def build_dropdown_plot_response(
         json_options=json.dumps(
             {
                 key: json.loads(
-                    chart.dump_options_with_quotes()
-                    if callable(getattr(chart, "dump_options_with_quotes", None))
-                    else chart.dump_options()
+                    _chart_json_options(chart)
                 )
                 for key, chart in charts_by_key.items()
             }
         ),
+        frontend_spec=frontend_spec,
     )
 
 
@@ -827,6 +966,14 @@ def build_nested_dropdown_plot_response(
         html=html,
         frame_height=_parse_pixel_height(height, default=420) + 120,
     )
+    frontend_spec = _build_nested_frontend_spec(
+        charts_by_primary_key,
+        primary_label=primary_label,
+        secondary_label=secondary_label,
+        default_primary_key=selected_primary_key,
+        default_secondary_key=selected_secondary_key,
+        height=height,
+    )
     return PlotResponse(
         chart=charts_by_primary_key[selected_primary_key][selected_secondary_key],
         notebook=notebook,
@@ -835,13 +982,12 @@ def build_nested_dropdown_plot_response(
             {
                 primary_key: {
                     secondary_key: json.loads(
-                        chart.dump_options_with_quotes()
-                        if callable(getattr(chart, "dump_options_with_quotes", None))
-                        else chart.dump_options()
+                        _chart_json_options(chart)
                     )
                     for secondary_key, chart in charts_by_secondary_key.items()
                 }
                 for primary_key, charts_by_secondary_key in charts_by_primary_key.items()
             }
         ),
+        frontend_spec=frontend_spec,
     )

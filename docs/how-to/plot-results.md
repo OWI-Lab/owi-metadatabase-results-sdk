@@ -93,5 +93,6 @@ Every `PlotResponse` provides multiple output formats:
 |-----------|------|-------------|
 | `notebook` | widget/`None` | Jupyter-compatible widget for inline display. |
 | `html` | `str`/`None` | Standalone HTML string for embedding. |
-| `json_options` | `dict`/`None` | Raw chart configuration for custom rendering. |
+| `json_options` | `str`/`None` | Serialized chart configuration for compatibility and low-level integrations. |
+| `frontend_spec` | `dict`/`None` | Structured ECharts spec for web frontends that render charts outside notebook HTML wrappers. |
 | `chart` | object/`None` | The underlying pyecharts chart object. |

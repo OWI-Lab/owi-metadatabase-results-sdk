@@ -83,6 +83,11 @@ class TestHistogramPlotStrategy:
         assert response.html
         options = json.loads(response.json_options)
         assert "series" in options
+        assert response.frontend_spec is not None
+        assert response.frontend_spec["renderer"] == "echarts"
+        assert response.frontend_spec["mode"] == "single"
+        assert response.frontend_spec["controls"] == []
+        assert "series" in response.frontend_spec["option"]
 
     def test_render_nan_bin_right(self) -> None:
         strategy = HistogramPlotStrategy()
@@ -110,6 +115,9 @@ class TestTimeSeriesPlotStrategy:
         assert isinstance(response, PlotResponse)
         options = json.loads(response.json_options)
         assert options["title"][0]["text"] == "Custom Title"
+        assert response.frontend_spec is not None
+        assert response.frontend_spec["mode"] == "single"
+        assert response.frontend_spec["option"]["title"][0]["text"] == "Custom Title"
 
     def test_render_uses_analysis_name_as_title(self) -> None:
         strategy = TimeSeriesPlotStrategy()
@@ -160,6 +168,13 @@ class TestBuildDropdownPlotResponse:
         )
         assert "FA1" in response.html
         assert "SS1" in response.html
+        assert response.frontend_spec is not None
+        assert response.frontend_spec["mode"] == "dropdown"
+        assert response.frontend_spec["height"] == "420px"
+        assert response.frontend_spec["controls"][0]["label"] == "Metric"
+        assert response.frontend_spec["controls"][0]["param_name"] == "metric"
+        assert response.frontend_spec["controls"][0]["default_value"] == "SS1"
+        assert set(response.frontend_spec["options_by_key"]) == {"FA1", "SS1"}
 
     def test_does_not_include_theme_selector(self) -> None:
         chart = Bar()
@@ -257,6 +272,20 @@ class TestBuildNestedDropdownPlotResponse:
         assert "owi-results-dropdown-item" in response.html
         assert "<select" not in response.html
         assert "Theme" not in response.html
+        assert response.frontend_spec is not None
+        assert response.frontend_spec["mode"] == "nested_dropdown"
+        assert response.frontend_spec["height"] == "420px"
+        assert response.frontend_spec["controls"][0]["label"] == "Metric"
+        assert response.frontend_spec["controls"][0]["param_name"] == "metric"
+        assert response.frontend_spec["controls"][0]["default_value"] == "FA1"
+        assert response.frontend_spec["controls"][1]["label"] == "Reference"
+        assert response.frontend_spec["controls"][1]["param_name"] == "reference"
+        assert response.frontend_spec["controls"][1]["default_value"] == "INFL"
+        assert response.frontend_spec["controls"][1]["options_by_parent"]["FA1"] == [
+            {"value": "INFL", "label": "INFL"}
+        ]
+        assert "FA1" in response.frontend_spec["options_by_primary_key"]
+        assert "INFL" in response.frontend_spec["options_by_primary_key"]["FA1"]
 
     def test_includes_geo_map_dependency(self) -> None:
         chart = Geo()
@@ -269,6 +298,8 @@ class TestBuildNestedDropdownPlotResponse:
             secondary_label="Reference",
         )
         assert "maps/world.js" in response.html
+        assert response.frontend_spec is not None
+        assert response.frontend_spec["dependencies"] == ["echarts", "world"]
 
     def test_nested_does_not_include_theme_selector(self) -> None:
         chart = Bar()
