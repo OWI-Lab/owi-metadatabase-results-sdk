@@ -60,6 +60,19 @@ class StubLocationRepository(StubRepository):
         return pd.DataFrame(result)
 
 
+class MultiAnalysisRepository(StubRepository):
+    """Repository stub that returns different result frames per analysis name."""
+
+    def __init__(self, frames_by_analysis: dict[str, pd.DataFrame]) -> None:
+        super().__init__(pd.DataFrame())
+        self.frames_by_analysis = frames_by_analysis
+        self.queries: list[Any] = []
+
+    def list_results(self, query: Any) -> pd.DataFrame:
+        self.queries.append(query)
+        return self.frames_by_analysis.get(query.analysis_name, pd.DataFrame())
+
+
 def test_wind_speed_histogram_to_results_and_plot() -> None:
     analysis = WindSpeedHistogram()
     results = analysis.to_results(
@@ -330,6 +343,144 @@ def test_results_service_plot_results_supports_geo_plot_type() -> None:
     assert "Metric" in response.html
     assert "Reference" in response.html
     assert options["FA1"]["INFL"]["legend"][0]["show"] is False
+
+
+def test_results_service_plot_results_supports_assembled_plot_type() -> None:
+    frequency_analysis = LifetimeDesignFrequencies()
+    verification_analysis = LifetimeDesignVerification()
+    frequency_results = frequency_analysis.to_results(
+        {
+            "rows": [
+                {
+                    "turbine": "WFA03",
+                    "reference": "INFL",
+                    "FA1": 2.4123,
+                    "location_id": 9,
+                },
+                {
+                    "turbine": "WFA03",
+                    "reference": "ACTU",
+                    "FA1": 1.9184,
+                    "location_id": 9,
+                },
+                {
+                    "turbine": "WFB07",
+                    "reference": "INFL",
+                    "FA1": 2.1038,
+                    "location_id": 10,
+                },
+                {
+                    "turbine": "WFB07",
+                    "reference": "ACTU",
+                    "FA1": 1.4472,
+                    "location_id": 10,
+                },
+            ]
+        }
+    )
+    verification_results = verification_analysis.to_results(
+        {
+            "rows": [
+                {
+                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                    "turbine": "WFA03",
+                    "FA1": 2.5517,
+                    "location_id": 9,
+                },
+                {
+                    "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
+                    "turbine": "WFB07",
+                    "FA1": 2.2746,
+                    "location_id": 10,
+                },
+            ]
+        }
+    )
+    repository = MultiAnalysisRepository(
+        {
+            "LifetimeDesignFrequencies": pd.DataFrame(
+                [series.to_record_payload(analysis_id=17) for series in frequency_results]
+            ),
+            "LifetimeDesignVerification": pd.DataFrame(
+                [series.to_record_payload(analysis_id=19) for series in verification_results]
+            ),
+        }
+    )
+    service = ResultsService(repository=repository)
+
+    response = service.plot_results(
+        "LifetimeDesignVerification",
+        filters={"analysis_id": 999},
+        plot_type="assembled",
+    )
+    options = json.loads(response.json_options)
+
+    assert "FA1" in options
+    assert options["FA1"]["xAxis"][0]["data"] == ["WFA03", "WFB07"]
+    assert options["FA1"]["legend"][0]["data"] == ["INFL", "ACTU"]
+    assert [series["name"] for series in options["FA1"]["series"]] == ["INFL", "ACTU", "Verification"]
+    assert [query.analysis_name for query in repository.queries] == [
+        "LifetimeDesignFrequencies",
+        "LifetimeDesignVerification",
+    ]
+    assert repository.queries[0].analysis_id is None
+    assert repository.queries[1].analysis_id == 999
+
+
+def test_results_service_plot_results_supports_assembled_plot_from_frequency_owner() -> None:
+    frequency_analysis = LifetimeDesignFrequencies()
+    verification_analysis = LifetimeDesignVerification()
+    repository = MultiAnalysisRepository(
+        {
+            "LifetimeDesignFrequencies": pd.DataFrame(
+                [
+                    series.to_record_payload(analysis_id=17)
+                    for series in frequency_analysis.to_results(
+                        {
+                            "rows": [
+                                {
+                                    "turbine": "WFA03",
+                                    "reference": "INFL",
+                                    "FA1": 2.4123,
+                                    "location_id": 9,
+                                },
+                                {
+                                    "turbine": "WFA03",
+                                    "reference": "ACTU",
+                                    "FA1": 1.9184,
+                                    "location_id": 9,
+                                },
+                            ]
+                        }
+                    )
+                ]
+            ),
+            "LifetimeDesignVerification": pd.DataFrame(
+                [
+                    series.to_record_payload(analysis_id=19)
+                    for series in verification_analysis.to_results(
+                        {
+                            "rows": [
+                                {
+                                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                                    "turbine": "WFA03",
+                                    "FA1": 2.5517,
+                                    "location_id": 9,
+                                }
+                            ]
+                        }
+                    )
+                ]
+            ),
+        }
+    )
+    service = ResultsService(repository=repository)
+
+    response = service.plot_results("LifetimeDesignFrequencies", plot_type="assembled")
+    options = json.loads(response.json_options)
+
+    assert "FA1" in options
+    assert options["FA1"]["legend"][0]["data"] == ["INFL", "ACTU"]
 
 
 def test_results_service_comparison_and_location_plots_are_distinct() -> None:
