@@ -10,7 +10,9 @@ from owi.metadatabase.locations.io import LocationsAPI  # ty: ignore[unresolved-
 
 from ..io import ResultsAPI
 from ..models import PlotRequest, PlotResponse, ResultQuery, ResultSeries
-from ..protocols import AnalysisRegistryProtocol, ResultsRepositoryProtocol
+from ..plotting.definitions import PlotSourceData, PlotSourceSpec
+from ..plotting.registry import get_plot_definition
+from ..protocols import AnalysisRegistryProtocol, PlotDefinitionProtocol, ResultsRepositoryProtocol
 from ..registry import default_registry
 from ..serializers import DjangoResultSerializer
 
@@ -171,6 +173,54 @@ class ResultsService:
             context["location_frame"] = location_frame
         return context
 
+    def _plot_source_data(
+        self,
+        source_spec: PlotSourceSpec,
+        *,
+        owner_analysis_name: str,
+        query: ResultQuery,
+    ) -> PlotSourceData:
+        """Fetch and normalize one named plot source."""
+        source_query = source_spec.build_query(query, owner_analysis_name)
+        source_records = self.get_result_series(source_spec.analysis_name, source_query)
+        source_analysis = self.registry.get(source_spec.analysis_name)
+        return PlotSourceData(
+            key=source_spec.key,
+            analysis_name=source_spec.analysis_name,
+            query=source_query,
+            records=source_records,
+            frame=source_analysis.from_results(source_records),
+        )
+
+    def _plot_defined_results(
+        self,
+        definition: PlotDefinitionProtocol,
+        *,
+        owner_analysis_name: str,
+        query: ResultQuery,
+        plot_type: str | None,
+    ) -> PlotResponse:
+        """Render a plot assembled from one or more named sources."""
+        source_specs = tuple(definition.build_sources(query, owner_analysis_name))
+        sources_by_key = {
+            source_spec.key: self._plot_source_data(
+                source_spec,
+                owner_analysis_name=owner_analysis_name,
+                query=query,
+            )
+            for source_spec in source_specs
+        }
+        plot_request = PlotRequest(
+            analysis_name=owner_analysis_name,
+            filters=query.model_dump(),
+            plot_type=plot_type,
+            context={
+                "source_keys": list(sources_by_key),
+                "source_analysis_names": [source_data.analysis_name for source_data in sources_by_key.values()],
+            },
+        )
+        return definition.render(sources_by_key, plot_request)
+
     def plot_results(
         self,
         analysis_name: str,
@@ -180,6 +230,14 @@ class ResultsService:
     ) -> PlotResponse:
         """Render a chart for the requested analysis."""
         query = self._coerce_query(analysis_name, filters)
+        plot_definition = get_plot_definition(analysis_name, plot_type)
+        if plot_definition is not None:
+            return self._plot_defined_results(
+                plot_definition,
+                owner_analysis_name=analysis_name,
+                query=query,
+                plot_type=plot_type,
+            )
         records = self.get_result_series(analysis_name, query)
         analysis = self.registry.get(analysis_name)
         plot_request = PlotRequest(

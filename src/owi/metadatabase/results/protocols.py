@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import pandas as pd
 
 from .models import PlotRequest, PlotResponse, ResultQuery, ResultSeries
+
+if TYPE_CHECKING:
+    from .plotting.definitions import PlotSourceData, PlotSourceSpec
 
 
 @runtime_checkable
@@ -63,6 +66,20 @@ class AnalysisProtocol(Protocol):
         plot_strategy: PlotStrategyProtocol | None = None,
     ) -> PlotResponse:
         """Plot reconstructed results using the default or injected strategy."""
+
+
+@runtime_checkable
+class PlotDefinitionProtocol(Protocol):
+    """Protocol for registered custom plot definitions."""
+
+    owner_analysis_names: tuple[str, ...]
+    plot_type: str
+
+    def build_sources(self, query: ResultQuery, owner_analysis_name: str) -> Sequence[PlotSourceSpec]:
+        """Return the source specifications required by this plot."""
+
+    def render(self, sources_by_key: Mapping[str, PlotSourceData], request: PlotRequest) -> PlotResponse:
+        """Render a chart from fetched plot source data."""
 
 
 @runtime_checkable
