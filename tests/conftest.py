@@ -84,8 +84,8 @@ def sample_frequency_results() -> list[ResultSeries]:
     return LifetimeDesignFrequencies().to_results(
         {
             "rows": [
-                {"turbine": "BBA01", "reference": "INFL", "FA1": 0.3406, "SS1": 0.3407, "location_id": 9},
-                {"turbine": "BBA01", "reference": "ACTU", "FA1": 0.3330, "SS1": 0.3332, "location_id": 9},
+                {"turbine": "WFA03", "reference": "INFL", "FA1": 0.3406, "SS1": 0.3407, "location_id": 9},
+                {"turbine": "WFA03", "reference": "ACTU", "FA1": 0.3330, "SS1": 0.3332, "location_id": 9},
             ]
         }
     )
@@ -101,14 +101,14 @@ def sample_verification_results() -> list[ResultSeries]:
             "rows": [
                 {
                     "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "FA1": 0.356,
                     "SS1": 0.357,
                     "location_id": 5,
                 },
                 {
                     "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "FA1": 0.355,
                     "SS1": 0.356,
                     "location_id": 5,
@@ -139,7 +139,7 @@ def sample_location_frame() -> pd.DataFrame:
     """Location metadata fixture for geo-plot tests."""
     return pd.DataFrame(
         [
-            {"id": 9, "title": "BBA01", "northing": 51.5, "easting": 2.8},
-            {"id": 10, "title": "BBA02", "northing": 51.6, "easting": 2.9},
+            {"id": 9, "title": "WFA03", "northing": 51.5, "easting": 2.8},
+            {"id": 10, "title": "WFB07", "northing": 51.6, "easting": 2.9},
         ]
     )

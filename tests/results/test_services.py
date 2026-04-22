@@ -105,14 +105,14 @@ def test_lifetime_design_verification_to_results() -> None:
             "rows": [
                 {
                     "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "FA1": 0.356,
                     "SS1": 0.357,
                     "location_id": 5,
                 },
                 {
                     "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "FA1": 0.355,
                     "SS1": 0.356,
                     "location_id": 5,
@@ -164,7 +164,7 @@ def test_results_service_deserialize_result_series_from_dataframe() -> None:
                 "name_col3": None,
                 "units_col3": None,
                 "value_col3": [],
-                "short_description": "BBA01 - FA1",
+                "short_description": "WFA03 - FA1",
                 "description": None,
                 "data_additional": {
                     "analysis_kind": "comparison",
@@ -189,14 +189,14 @@ def test_results_service_get_result_series_fetches_typed_results() -> None:
         {
             "rows": [
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "INFL",
                     "FA1": 0.3406,
                     "SS1": 0.3407,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "ACTU",
                     "FA1": 0.3330,
                     "SS1": 0.3332,
@@ -211,7 +211,7 @@ def test_results_service_get_result_series_fetches_typed_results() -> None:
     retrieved = service.get_result_series("LifetimeDesignFrequencies", filters={"analysis_id": 17})
 
     assert len(retrieved) == 2
-    assert all(series.short_description.startswith("BBA01") for series in retrieved)
+    assert all(series.short_description.startswith("WFA03") for series in retrieved)
 
 
 def test_results_service_get_location_frame_filters_requested_ids() -> None:
@@ -220,8 +220,8 @@ def test_results_service_get_location_frame_filters_requested_ids() -> None:
             pd.DataFrame(),
             pd.DataFrame(
                 [
-                    {"id": 9, "title": "BBA01", "northing": 51.5, "easting": 2.8},
-                    {"id": 10, "title": "BBA02", "northing": 51.6, "easting": 2.9},
+                    {"id": 9, "title": "WFA03", "northing": 51.5, "easting": 2.8},
+                    {"id": 10, "title": "WFB07", "northing": 51.6, "easting": 2.9},
                 ]
             ),
         )
@@ -248,14 +248,14 @@ def test_lifetime_design_frequencies_to_results() -> None:
         {
             "rows": [
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "INFL",
                     "FA1": 0.3406,
                     "SS1": 0.3407,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "ACTU",
                     "FA1": 0.3330,
                     "SS1": 0.3332,
@@ -281,14 +281,14 @@ def test_lifetime_design_frequencies_plot_uses_reference_legend() -> None:
         {
             "rows": [
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "INFL",
                     "FA1": 0.3406,
                     "SS1": 0.3407,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "ACTU",
                     "FA1": 0.3330,
                     "SS1": 0.3332,
@@ -313,14 +313,14 @@ def test_results_service_plot_results_supports_geo_plot_type() -> None:
         {
             "rows": [
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "INFL",
                     "FA1": 0.3406,
                     "SS1": 0.3407,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "ACTU",
                     "FA1": 0.3330,
                     "SS1": 0.3332,
@@ -332,7 +332,7 @@ def test_results_service_plot_results_supports_geo_plot_type() -> None:
     frame = pd.DataFrame([series.to_record_payload(analysis_id=17) for series in results])
     location_frame = pd.DataFrame(
         [
-            {"id": 9, "title": "BBA01", "northing": 51.5, "easting": 2.8},
+            {"id": 9, "title": "WFA03", "northing": 51.5, "easting": 2.8},
         ]
     )
     service = ResultsService(repository=StubLocationRepository(frame, location_frame))
@@ -489,28 +489,28 @@ def test_results_service_comparison_and_location_plots_are_distinct() -> None:
         {
             "rows": [
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "INFL",
                     "FA1": 0.3406,
                     "SS1": 0.3407,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "ACTU",
                     "FA1": 0.3330,
                     "SS1": 0.3332,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA02",
+                    "turbine": "WFB07",
                     "reference": "INFL",
                     "FA1": 0.3201,
                     "SS1": 0.3204,
                     "location_id": 10,
                 },
                 {
-                    "turbine": "BBA02",
+                    "turbine": "WFB07",
                     "reference": "ACTU",
                     "FA1": 0.3111,
                     "SS1": 0.3114,
@@ -522,8 +522,8 @@ def test_results_service_comparison_and_location_plots_are_distinct() -> None:
     frame = pd.DataFrame([series.to_record_payload(analysis_id=17) for series in results])
     location_frame = pd.DataFrame(
         [
-            {"id": 9, "title": "BBA01", "northing": 51.5, "easting": 2.8},
-            {"id": 10, "title": "BBA02", "northing": 51.6, "easting": 2.9},
+            {"id": 9, "title": "WFA03", "northing": 51.5, "easting": 2.8},
+            {"id": 10, "title": "WFB07", "northing": 51.6, "easting": 2.9},
         ]
     )
     service = ResultsService(repository=StubLocationRepository(frame, location_frame))
@@ -534,8 +534,8 @@ def test_results_service_comparison_and_location_plots_are_distinct() -> None:
     location_options = json.loads(location_response.json_options)
 
     assert comparison_options["FA1"]["xAxis"][0]["data"] == ["INFL", "ACTU"]
-    assert location_options["FA1"]["xAxis"][0]["data"] == ["BBA01", "BBA02"]
-    assert [series["name"] for series in comparison_options["FA1"]["series"]] == ["BBA01", "BBA02"]
+    assert location_options["FA1"]["xAxis"][0]["data"] == ["WFA03", "WFB07"]
+    assert [series["name"] for series in comparison_options["FA1"]["series"]] == ["WFA03", "WFB07"]
     assert [series["name"] for series in location_options["FA1"]["series"]] == ["ACTU", "INFL"]
 
 
@@ -555,7 +555,7 @@ def test_django_result_serializer_ignores_empty_third_vector() -> None:
             "name_col3": None,
             "units_col3": None,
             "value_col3": [],
-            "short_description": "BBA01 - FA1",
+            "short_description": "WFA03 - FA1",
             "description": None,
             "data_additional": {
                 "analysis_kind": "comparison",
@@ -583,7 +583,7 @@ def test_django_result_serializer_reads_json_data_additional() -> None:
             "name_col3": None,
             "units_col3": None,
             "value_col3": None,
-            "short_description": "BBA01 - FA1",
+            "short_description": "WFA03 - FA1",
             "description": None,
             "data_additional": json.dumps(
                 {
@@ -710,7 +710,7 @@ class TestPlotContext:
                 ResultVector(name="y", unit="v", values=[2.0]),
             ],
         )
-        location_frame = pd.DataFrame([{"id": 9, "title": "BBA01", "northing": 51, "easting": 2}])
+        location_frame = pd.DataFrame([{"id": 9, "title": "WFA03", "northing": 51, "easting": 2}])
         service = ResultsService(
             repository=StubLocationRepository(pd.DataFrame(), location_frame),
         )
