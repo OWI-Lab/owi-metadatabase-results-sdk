@@ -300,7 +300,26 @@ class ResultsService:
         plot_type: str | None = None,
         source_filters: Mapping[str, ResultQuery | Mapping[str, Any]] | None = None,
     ) -> PlotResponse:
-        """Render a chart for the requested analysis."""
+        """Render a chart for a single analysis or a registered cross-analysis plot.
+
+        Parameters
+        ----------
+        analysis_name : str | None, optional
+            Analysis name used for ordinary single-analysis plot types. For
+            owner-invariant cross-analysis plot types such as
+            ``cross_analysis_fleetwide``, this can be omitted.
+        filters : ResultQuery | Mapping[str, Any] | None, optional
+            Shared query filters. For cross-analysis plots, these filters are
+            applied to every named source unless overridden in
+            ``source_filters``.
+        plot_type : str | None, optional
+            Plot type to render.
+        source_filters : Mapping[str, ResultQuery | Mapping[str, Any]] | None, optional
+            Per-source query overrides for registered cross-analysis plots.
+            The mapping keys must match the plot definition source keys, such as
+            ``"frequency"`` and ``"verification"`` for
+            ``cross_analysis_fleetwide``.
+        """
         requested_analysis_name = analysis_name or self._coerce_query(None, filters).analysis_name
         plot_definition = get_plot_definition(plot_type, analysis_name=requested_analysis_name)
         if plot_definition is not None:

@@ -350,12 +350,16 @@ print(retrieved_frame.head())
 
 ## Step 7 — Plot the Results
 
-The `ResultsService` provides two plot types for this analysis:
+The `ResultsService` provides three plot types relevant to this workflow:
 
 | Plot type | Visualization |
 |-----------|---------------|
 | `time_series` | Verification metrics evolving across timestamps. |
 | `comparison` | Metric values compared across turbines or grouped series. |
+| `cross_analysis_fleetwide` | Fleetwide overlay combining persisted verification and frequency analyses. |
+
+The cross-analysis fleetwide plot assumes you already have a matching
+`LifetimeDesignFrequencies` analysis persisted for the same assets.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -367,17 +371,21 @@ The `ResultsService` provides two plot types for this analysis:
 graph TD
     A["Selected analysis id"] --> B["Create time-series plot"]
     A --> C["Create comparison plot"]
-    B --> D["Time-series widget"]
-    C --> E["Comparison widget"]
-    D --> F["Display plots"]
-    E --> F
+    A --> D["Select matching frequency analysis id"]
+    B --> E["Time-series widget"]
+    C --> F["Comparison widget"]
+    D --> G["Create cross-analysis fleetwide plot"]
+    G --> H["Fleetwide widget"]
+    E --> I["Display plots"]
+    F --> I
+    H --> I
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
 
-    class B,C api;
-    class D,E,F keep;
+    class B,C,G api;
+    class D,E,F,H,I keep;
     class A build;
 ```
 
@@ -396,9 +404,21 @@ comparison_plot = results_service.plot_results(
     plot_type="comparison",
 )
 
+verification_analysis_id = analysis_id
+frequency_analysis_id = 46  # Existing LifetimeDesignFrequencies analysis for the same assets
+
+cross_analysis_fleetwide_plot = results_service.plot_results(
+    plot_type="cross_analysis_fleetwide",
+    source_filters={
+        "frequency": {"analysis_id": frequency_analysis_id},
+        "verification": {"analysis_id": verification_analysis_id},
+    },
+)
+
 # Display in a notebook environment.
 display(time_series_plot.notebook)
 display(comparison_plot.notebook)
+display(cross_analysis_fleetwide_plot.notebook)
 ```
 
 ---
@@ -411,7 +431,8 @@ display(comparison_plot.notebook)
 - How to conditionally create or reuse analyses and upload result rows
   with `create_or_update_results_bulk`.
 - How to retrieve and reconstruct typed result series from persisted data.
-- How to render time-series and comparison plots through `ResultsService`.
+- How to render time-series, comparison, and cross-analysis fleetwide plots
+  through `ResultsService`.
 
 ## Next Steps
 

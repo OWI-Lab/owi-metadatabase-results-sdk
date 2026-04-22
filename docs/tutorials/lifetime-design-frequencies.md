@@ -340,13 +340,17 @@ print(retrieved_frame.head())
 
 ## Step 7 — Plot the Results
 
-The `ResultsService` provides three plot types for this analysis:
+The `ResultsService` provides four plot types relevant to this workflow:
 
 | Plot type | Visualization |
 |-----------|---------------|
 | `comparison` | Metrics across references with a location dropdown. |
 | `location` | Values grouped by turbine with a metric dropdown. |
 | `geo` | Results projected onto a geographic site map. |
+| `cross_analysis_fleetwide` | Fleetwide overlay combining persisted frequency and verification analyses. |
+
+The cross-analysis fleetwide plot assumes you already have a matching
+`LifetimeDesignVerification` analysis persisted for the same assets.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -359,19 +363,23 @@ graph TD
     A["Selected analysis id"] --> B["Create comparison plot"]
     A --> C["Create location plot"]
     A --> D["Create geo plot"]
-    B --> E["Comparison widget"]
-    C --> F["Location widget"]
-    D --> G["Geo widget"]
-    E --> H["Display plots"]
-    F --> H
-    G --> H
+    A --> E["Select matching verification analysis id"]
+    B --> F["Comparison widget"]
+    C --> G["Location widget"]
+    D --> H["Geo widget"]
+    E --> I["Create cross-analysis fleetwide plot"]
+    I --> J["Fleetwide widget"]
+    F --> K["Display plots"]
+    G --> K
+    H --> K
+    J --> K
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
 
-    class B,C,D api;
-    class E,F,G,H keep;
+    class B,C,D,I api;
+    class E,F,G,H,J,K keep;
     class A build;
 ```
 
@@ -396,10 +404,22 @@ geo_plot = results_service.plot_results(
     plot_type="geo",
 )
 
+frequency_analysis_id = analysis_id
+verification_analysis_id = 52  # Existing LifetimeDesignVerification analysis for the same assets
+
+cross_analysis_fleetwide_plot = results_service.plot_results(
+    plot_type="cross_analysis_fleetwide",
+    source_filters={
+        "frequency": {"analysis_id": frequency_analysis_id},
+        "verification": {"analysis_id": verification_analysis_id},
+    },
+)
+
 # Display in a notebook environment.
 display(comparison_plot.notebook)
 display(location_plot.notebook)
 display(geo_plot.notebook)
+display(cross_analysis_fleetwide_plot.notebook)
 ```
 
 ---
@@ -412,7 +432,7 @@ display(geo_plot.notebook)
 - How to conditionally create or reuse analyses and upload result rows
   with `create_or_update_results_bulk`.
 - How to retrieve and reconstruct typed result series from persisted data.
-- How to render comparison, location, and geo plots through
+- How to render comparison, location, geo, and cross-analysis fleetwide plots through
   `ResultsService`.
 
 ## Next Steps

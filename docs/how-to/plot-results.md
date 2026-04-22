@@ -72,6 +72,24 @@ plot = service.plot_results(
 display(plot.notebook)
 ```
 
+### Cross-analysis Fleetwide Plot
+
+Fleetwide overlay combining actual frequency reference lines with
+verification points across assets. Unlike the single-analysis plot types
+above, this plot is selected only by `plot_type`; the contributing
+analyses are passed through named `source_filters`.
+
+```python
+plot = service.plot_results(
+    plot_type="cross_analysis_fleetwide",
+    source_filters={
+        "frequency": {"analysis_id": 46},
+        "verification": {"analysis_id": 50},
+    },
+)
+display(plot.notebook)
+```
+
 ### Histogram Plot
 
 Bar chart for binned data (e.g. `WindSpeedHistogram`):

@@ -69,9 +69,11 @@ flowchart TD
 
   Service --> Serializers[serializers.py\nDjangoAnalysisSerializer\nDjangoResultSerializer]
   Service --> Registry[registry.py\nAnalysisRegistry]
+  Service --> PlotRegistry[plotting/registry.py\nRegistered cross-analysis plots]
   Serializers --> Models
 
   Registry --> BaseAnalysis[analyses/base.py\nBaseAnalysis mixin]
+  PlotRegistry --> PlotDefs[plotting/definitions.py\nPlotDefinition · PlotSourceSpec]
 
   BaseAnalysis --> Freq[analyses/lifetime_design_frequencies.py\nComparison + location + geo frequencies]
   BaseAnalysis --> Verify[analyses/lifetime_design_verification.py\nTime-series verification]
@@ -83,18 +85,20 @@ flowchart TD
   Hist --> Models
   CEIT --> Models
 
-  Protocols[protocols.py\nAnalysisProtocol · PlotStrategyProtocol\nResultsRepositoryProtocol\nSerializerProtocol] -. structural contracts .-> Service
+  Protocols[protocols.py\nAnalysisProtocol · PlotStrategyProtocol\nPlotDefinitionProtocol · ResultsRepositoryProtocol\nSerializerProtocol] -. structural contracts .-> Service
   Protocols -. structural contracts .-> BaseAnalysis
   Protocols -. structural contracts .-> Repo
 
-  BaseAnalysis --> GenericPlots[plotting/strategies.py\nHistogramPlotStrategy\nTimeSeriesPlotStrategy]
+  BaseAnalysis --> GenericPlots[plotting/strategies.py\nGeneric single-analysis strategies]
   Freq --> FreqPlots[plotting/frequency.py\nComparison / location / geo plots]
   Verify --> VerifyPlots[plotting/verification.py\nTime-series metric charts]
+  PlotRegistry --> FreqVerifyPlots[plotting/frequency_verification.py\nCross-analysis fleetwide plot]
   CEIT --> CeitPlots[plotting/ceit.py\nSensor dropdown charts]
 
   GenericPlots --> PlotWidgets[plotting/response.py + theme.py\nDropdown builders + monospace theme]
   FreqPlots --> PlotWidgets
   VerifyPlots --> PlotWidgets
+  FreqVerifyPlots --> PlotWidgets
   CeitPlots --> PlotWidgets
 
   Repo -. location metadata .-> Locations[owi.metadatabase.locations\nLocationsAPI]
@@ -106,9 +110,10 @@ flowchart TD
   classDef external fill:#f3f4f6,stroke:#6b7280,color:#374151;
   classDef contract fill:#fef3c7,stroke:#d97706,color:#78350f;
 
-  class Service,Repo,Registry,BaseAnalysis core;
-  class GenericPlots,FreqPlots,VerifyPlots,CeitPlots,PlotWidgets core;
+  class Service,Repo,Registry,PlotRegistry,BaseAnalysis core;
+  class GenericPlots,FreqPlots,VerifyPlots,FreqVerifyPlots,CeitPlots,PlotWidgets core;
   class Freq,Verify,Hist,CEIT,Models,Serializers domain;
+  class PlotDefs domain;
   class API,Endpoints infra;
   class User,Locations,Geometry external;
   class Protocols contract;
