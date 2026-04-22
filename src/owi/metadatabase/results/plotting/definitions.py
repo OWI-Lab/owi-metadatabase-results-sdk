@@ -16,7 +16,7 @@ class PlotSourceSpec:
 
     key: str
     analysis_name: str
-    build_query: Callable[[ResultQuery, str], ResultQuery]
+    build_query: Callable[[ResultQuery], ResultQuery]
 
 
 @dataclass(frozen=True)
@@ -34,7 +34,7 @@ class PlotSourceData:
 class PlotDefinition:
     """Declarative definition of a registered custom plot."""
 
-    owner_analysis_names: tuple[str, ...]
+    supported_analysis_names: tuple[str, ...]
     plot_type: str
-    build_sources: Callable[[ResultQuery, str], Sequence[PlotSourceSpec]]
+    build_sources: Callable[[ResultQuery], Sequence[PlotSourceSpec]]
     render: Callable[[Mapping[str, PlotSourceData], PlotRequest], PlotResponse]

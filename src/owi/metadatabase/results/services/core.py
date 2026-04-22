@@ -102,16 +102,48 @@ class ResultsService:
 
     def _coerce_query(
         self,
-        analysis_name: str,
+        analysis_name: str | None,
         filters: ResultQuery | Mapping[str, Any] | None = None,
     ) -> ResultQuery:
         """Build a concrete query model from loose filter input."""
-        query = (
-            filters if isinstance(filters, ResultQuery) else ResultQuery(analysis_name=analysis_name, **(filters or {}))
-        )
-        if query.analysis_name is None:
+        query = filters if isinstance(filters, ResultQuery) else ResultQuery(**(filters or {}))
+        if analysis_name is not None and query.analysis_name is None:
             query = query.model_copy(update={"analysis_name": analysis_name})
         return query
+
+    @staticmethod
+    def _strip_analysis_filters(query: ResultQuery) -> ResultQuery:
+        """Remove analysis-specific identifiers from a shared base query."""
+        backend_filters = {
+            key: value
+            for key, value in query.backend_filters.items()
+            if key not in {"analysis__id", "analysis__name"}
+        }
+        return query.model_copy(
+            update={
+                "analysis_name": None,
+                "analysis_id": None,
+                "backend_filters": backend_filters,
+            }
+        )
+
+    def _merge_queries(
+        self,
+        base_query: ResultQuery,
+        overrides: ResultQuery | Mapping[str, Any] | None,
+    ) -> ResultQuery:
+        """Merge source-specific overrides onto a shared base query."""
+        if overrides is None:
+            return base_query.model_copy()
+        override_query = self._coerce_query(None, overrides)
+        merged = base_query.model_dump()
+        override_values = override_query.model_dump(exclude_none=True)
+        merged.update({key: value for key, value in override_values.items() if key != "backend_filters"})
+        merged["backend_filters"] = {
+            **base_query.backend_filters,
+            **override_query.backend_filters,
+        }
+        return ResultQuery(**merged)
 
     def deserialize_result_series(
         self,
@@ -177,11 +209,10 @@ class ResultsService:
         self,
         source_spec: PlotSourceSpec,
         *,
-        owner_analysis_name: str,
         query: ResultQuery,
     ) -> PlotSourceData:
         """Fetch and normalize one named plot source."""
-        source_query = source_spec.build_query(query, owner_analysis_name)
+        source_query = source_spec.build_query(query)
         source_records = self.get_result_series(source_spec.analysis_name, source_query)
         source_analysis = self.registry.get(source_spec.analysis_name)
         return PlotSourceData(
@@ -196,23 +227,63 @@ class ResultsService:
         self,
         definition: PlotDefinitionProtocol,
         *,
-        owner_analysis_name: str,
-        query: ResultQuery,
+        requested_analysis_name: str | None,
+        filters: ResultQuery | Mapping[str, Any] | None,
         plot_type: str | None,
+        source_filters: Mapping[str, ResultQuery | Mapping[str, Any]] | None,
     ) -> PlotResponse:
-        """Render a plot assembled from one or more named sources."""
-        source_specs = tuple(definition.build_sources(query, owner_analysis_name))
+        """Render a plot built from one or more named sources."""
+        raw_query = self._coerce_query(None, filters)
+        if (
+            requested_analysis_name is not None
+            and raw_query.analysis_name is not None
+            and raw_query.analysis_name != requested_analysis_name
+        ):
+            raise ValueError(
+                "Conflicting analysis names were provided for the cross-analysis plot request: "
+                f"{requested_analysis_name!r} and {raw_query.analysis_name!r}."
+            )
+        compatibility_analysis_name = requested_analysis_name or raw_query.analysis_name
+        implicit_analysis_id = raw_query.analysis_id
+        base_query = self._strip_analysis_filters(raw_query)
+        source_specs = tuple(definition.build_sources(base_query))
+        source_spec_by_key = {source_spec.key: source_spec for source_spec in source_specs}
+        unexpected_source_filters = sorted(set(source_filters or {}).difference(source_spec_by_key))
+        if unexpected_source_filters:
+            unexpected = ", ".join(unexpected_source_filters)
+            raise ValueError(f"Unknown source_filters keys for plot type {plot_type!r}: {unexpected}.")
+
+        source_filter_overrides = dict(source_filters or {})
+        if implicit_analysis_id is not None:
+            if compatibility_analysis_name is None:
+                raise ValueError(
+                    "Cross-analysis plots require source_filters to disambiguate analysis_id values when "
+                    "analysis_name is not provided."
+                )
+            matching_source_keys = [
+                source_spec.key
+                for source_spec in source_specs
+                if source_spec.analysis_name == compatibility_analysis_name
+            ]
+            if len(matching_source_keys) != 1:
+                raise ValueError(
+                    "Cross-analysis plot compatibility could not map the provided analysis_name to exactly "
+                    "one source."
+                )
+            matching_source_key = matching_source_keys[0]
+            source_filter_overrides.setdefault(matching_source_key, {"analysis_id": implicit_analysis_id})
+
         sources_by_key = {
             source_spec.key: self._plot_source_data(
                 source_spec,
-                owner_analysis_name=owner_analysis_name,
-                query=query,
+                query=self._merge_queries(base_query, source_filter_overrides.get(source_spec.key)),
             )
             for source_spec in source_specs
         }
+        request_analysis_name = compatibility_analysis_name or (plot_type or "custom_plot")
         plot_request = PlotRequest(
-            analysis_name=owner_analysis_name,
-            filters=query.model_dump(),
+            analysis_name=request_analysis_name,
+            filters=base_query.model_dump(),
             plot_type=plot_type,
             context={
                 "source_keys": list(sources_by_key),
@@ -223,25 +294,32 @@ class ResultsService:
 
     def plot_results(
         self,
-        analysis_name: str,
+        analysis_name: str | None = None,
         filters: ResultQuery | Mapping[str, Any] | None = None,
         *,
         plot_type: str | None = None,
+        source_filters: Mapping[str, ResultQuery | Mapping[str, Any]] | None = None,
     ) -> PlotResponse:
         """Render a chart for the requested analysis."""
-        query = self._coerce_query(analysis_name, filters)
-        plot_definition = get_plot_definition(analysis_name, plot_type)
+        requested_analysis_name = analysis_name or self._coerce_query(None, filters).analysis_name
+        plot_definition = get_plot_definition(plot_type, analysis_name=requested_analysis_name)
         if plot_definition is not None:
             return self._plot_defined_results(
                 plot_definition,
-                owner_analysis_name=analysis_name,
-                query=query,
+                requested_analysis_name=requested_analysis_name,
+                filters=filters,
                 plot_type=plot_type,
+                source_filters=source_filters,
             )
-        records = self.get_result_series(analysis_name, query)
-        analysis = self.registry.get(analysis_name)
+        if source_filters:
+            raise ValueError("source_filters can only be used with registered cross-analysis plot types.")
+        if requested_analysis_name is None:
+            raise ValueError("analysis_name is required for plot types without a registered cross-analysis definition.")
+        query = self._coerce_query(requested_analysis_name, filters)
+        records = self.get_result_series(requested_analysis_name, query)
+        analysis = self.registry.get(requested_analysis_name)
         plot_request = PlotRequest(
-            analysis_name=analysis_name,
+            analysis_name=requested_analysis_name,
             filters=query.model_dump(),
             plot_type=plot_type,
             context=self._plot_context(records, plot_type=plot_type),
@@ -259,11 +337,17 @@ def get_results(
 
 
 def plot_results(
-    analysis_name: str,
+    analysis_name: str | None = None,
     filters: ResultQuery | Mapping[str, Any] | None = None,
     *,
     plot_type: str | None = None,
+    source_filters: Mapping[str, ResultQuery | Mapping[str, Any]] | None = None,
     service: ResultsService | None = None,
 ) -> PlotResponse:
     """Return a plotted chart using the default service."""
-    return (service or ResultsService()).plot_results(analysis_name, filters, plot_type=plot_type)
+    return (service or ResultsService()).plot_results(
+        analysis_name,
+        filters,
+        plot_type=plot_type,
+        source_filters=source_filters,
+    )

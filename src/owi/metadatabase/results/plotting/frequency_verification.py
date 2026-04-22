@@ -56,8 +56,6 @@ def _require_columns(frame: pd.DataFrame, required_columns: set[str], *, frame_n
 def _build_plot_source_query(
     query: ResultQuery,
     analysis_name: str,
-    *,
-    owner_analysis_name: str,
 ) -> ResultQuery:
     """Clone the base query for one source analysis."""
     backend_filters = {
@@ -68,7 +66,6 @@ def _build_plot_source_query(
     return query.model_copy(
         update={
             "analysis_name": analysis_name,
-            "analysis_id": query.analysis_id if analysis_name == owner_analysis_name else None,
             "backend_filters": backend_filters,
         }
     )
@@ -76,23 +73,22 @@ def _build_plot_source_query(
 
 def _build_frequency_verification_sources(
     query: ResultQuery,
-    owner_analysis_name: str,
 ) -> tuple[PlotSourceSpec, ...]:
-    """Return the named sources required by the assembled frequency/verification plot."""
+    """Return the named sources required by the cross-analysis fleetwide plot."""
     del query
     return (
         PlotSourceSpec(
             key=_FREQUENCY_SOURCE_KEY,
             analysis_name=LIFETIME_DESIGN_FREQUENCIES_ANALYSIS_NAME,
-            build_query=lambda source_query, source_owner, analysis_name=LIFETIME_DESIGN_FREQUENCIES_ANALYSIS_NAME: (
-                _build_plot_source_query(source_query, analysis_name, owner_analysis_name=source_owner)
+            build_query=lambda source_query, analysis_name=LIFETIME_DESIGN_FREQUENCIES_ANALYSIS_NAME: (
+                _build_plot_source_query(source_query, analysis_name)
             ),
         ),
         PlotSourceSpec(
             key=_VERIFICATION_SOURCE_KEY,
             analysis_name=LIFETIME_DESIGN_VERIFICATION_ANALYSIS_NAME,
-            build_query=lambda source_query, source_owner, analysis_name=LIFETIME_DESIGN_VERIFICATION_ANALYSIS_NAME: (
-                _build_plot_source_query(source_query, analysis_name, owner_analysis_name=source_owner)
+            build_query=lambda source_query, analysis_name=LIFETIME_DESIGN_VERIFICATION_ANALYSIS_NAME: (
+                _build_plot_source_query(source_query, analysis_name)
             ),
         ),
     )
@@ -162,19 +158,19 @@ def _render_frequency_verification_plot(
     sources_by_key: Mapping[str, PlotSourceData],
     request: Any,
 ) -> Any:
-    """Render the assembled frequency/verification comparison plot."""
+    """Render the cross-analysis fleetwide frequency/verification plot."""
     del request
     return plot_frequency_verification_comparison(assemble_frequency_verification_comparison_frame(sources_by_key))
 
 
 def build_frequency_verification_plot_definition() -> PlotDefinition:
-    """Return the registered assembled frequency/verification plot definition."""
+    """Return the registered cross-analysis fleetwide frequency/verification plot definition."""
     return PlotDefinition(
-        owner_analysis_names=(
+        supported_analysis_names=(
             LIFETIME_DESIGN_FREQUENCIES_ANALYSIS_NAME,
             LIFETIME_DESIGN_VERIFICATION_ANALYSIS_NAME,
         ),
-        plot_type="assembled",
+        plot_type="cross_analysis_fleetwide",
         build_sources=_build_frequency_verification_sources,
         render=_render_frequency_verification_plot,
     )
@@ -198,8 +194,8 @@ def _coerce_timestamp(value: Any) -> pd.Timestamp | None:
 def _normalize_frequency_verification_frame(data: pd.DataFrame) -> pd.DataFrame:
     """Normalize the combined comparison frame expected by the plotter.
 
-    Expected input is the assembled, long-form plotting frame produced by the
-    custom plotting layer, not raw backend result rows.
+    Expected input is the long-form plotting frame produced by the custom
+    cross-analysis plotting layer, not raw backend result rows.
     """
     if data.empty:
         return pd.DataFrame(columns=_NORMALIZED_COLUMNS)

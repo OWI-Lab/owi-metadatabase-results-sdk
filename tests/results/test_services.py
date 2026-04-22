@@ -345,7 +345,7 @@ def test_results_service_plot_results_supports_geo_plot_type() -> None:
     assert options["FA1"]["INFL"]["legend"][0]["show"] is False
 
 
-def test_results_service_plot_results_supports_assembled_plot_type() -> None:
+def test_results_service_plot_results_supports_cross_analysis_fleetwide_compatibility_mode() -> None:
     frequency_analysis = LifetimeDesignFrequencies()
     verification_analysis = LifetimeDesignVerification()
     frequency_results = frequency_analysis.to_results(
@@ -411,7 +411,7 @@ def test_results_service_plot_results_supports_assembled_plot_type() -> None:
     response = service.plot_results(
         "LifetimeDesignVerification",
         filters={"analysis_id": 999},
-        plot_type="assembled",
+        plot_type="cross_analysis_fleetwide",
     )
     options = json.loads(response.json_options)
 
@@ -427,7 +427,7 @@ def test_results_service_plot_results_supports_assembled_plot_type() -> None:
     assert repository.queries[1].analysis_id == 999
 
 
-def test_results_service_plot_results_supports_assembled_plot_from_frequency_owner() -> None:
+def test_results_service_plot_results_supports_cross_analysis_fleetwide_without_analysis_name() -> None:
     frequency_analysis = LifetimeDesignFrequencies()
     verification_analysis = LifetimeDesignVerification()
     repository = MultiAnalysisRepository(
@@ -476,11 +476,38 @@ def test_results_service_plot_results_supports_assembled_plot_from_frequency_own
     )
     service = ResultsService(repository=repository)
 
-    response = service.plot_results("LifetimeDesignFrequencies", plot_type="assembled")
+    response = service.plot_results(
+        filters={"location_id": 9},
+        plot_type="cross_analysis_fleetwide",
+        source_filters={
+            "frequency": {"analysis_id": 17},
+            "verification": {"analysis_id": 19},
+        },
+    )
     options = json.loads(response.json_options)
 
     assert "FA1" in options
     assert options["FA1"]["legend"][0]["data"] == ["INFL", "ACTU"]
+    assert [query.analysis_name for query in repository.queries] == [
+        "LifetimeDesignFrequencies",
+        "LifetimeDesignVerification",
+    ]
+    assert [query.analysis_id for query in repository.queries] == [17, 19]
+    assert [query.location_id for query in repository.queries] == [9, 9]
+
+
+def test_results_service_plot_results_cross_analysis_requires_source_filters_for_ambiguous_analysis_id() -> None:
+    service = ResultsService(repository=MultiAnalysisRepository({}))
+
+    try:
+        service.plot_results(
+            filters={"analysis_id": 999},
+            plot_type="cross_analysis_fleetwide",
+        )
+    except ValueError as exc:
+        assert "source_filters" in str(exc)
+    else:
+        raise AssertionError("Expected cross-analysis plot request with ambiguous analysis_id to fail.")
 
 
 def test_results_service_comparison_and_location_plots_are_distinct() -> None:

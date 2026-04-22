@@ -72,10 +72,10 @@ class AnalysisProtocol(Protocol):
 class PlotDefinitionProtocol(Protocol):
     """Protocol for registered custom plot definitions."""
 
-    owner_analysis_names: tuple[str, ...]
+    supported_analysis_names: tuple[str, ...]
     plot_type: str
 
-    def build_sources(self, query: ResultQuery, owner_analysis_name: str) -> Sequence[PlotSourceSpec]:
+    def build_sources(self, query: ResultQuery) -> Sequence[PlotSourceSpec]:
         """Return the source specifications required by this plot."""
 
     def render(self, sources_by_key: Mapping[str, PlotSourceData], request: PlotRequest) -> PlotResponse:
@@ -161,9 +161,10 @@ class QueryServiceProtocol(Protocol):
 
     def plot_results(
         self,
-        analysis_name: str,
+        analysis_name: str | None = None,
         filters: ResultQuery | Mapping[str, Any] | None = None,
         *,
         plot_type: str | None = None,
+        source_filters: Mapping[str, ResultQuery | Mapping[str, Any]] | None = None,
     ) -> PlotResponse:
         """Return a chart for normalized analysis data."""
