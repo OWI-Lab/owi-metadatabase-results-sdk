@@ -228,6 +228,7 @@ class TestBuildDropdownPlotResponse:
         assert response.notebook is not None
         assert "ResizeObserver" in response.notebook.data
         assert "window.frameElement.style.height" in response.notebook.data
+        assert 'sandbox="allow-downloads allow-scripts allow-same-origin"' in response.notebook.data
 
     def test_prefers_widget_notebook_renderer_when_available(self) -> None:
         chart = Bar()

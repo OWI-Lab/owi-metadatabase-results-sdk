@@ -381,7 +381,7 @@ def _build_iframe_markup(html: str, *, frame_height: int) -> str:
     iframe_html = (
         "<iframe "
         'class="owi-results-plot-frame" '
-        'sandbox="allow-scripts allow-same-origin" '
+        'sandbox="allow-downloads allow-scripts allow-same-origin" '
         'referrerpolicy="no-referrer" '
         'style="width:100%;border:0;overflow:hidden;" '
         f' height="{frame_height}" '
