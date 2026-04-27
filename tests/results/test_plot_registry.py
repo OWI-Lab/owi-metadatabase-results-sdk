@@ -21,6 +21,12 @@ def test_get_plot_definition_supports_cross_analysis_plot_without_owner() -> Non
     assert definition is not None
 
 
+def test_get_plot_definition_supports_cross_analysis_asset_plot_without_owner() -> None:
+    definition = get_plot_definition("cross_analysis_asset")
+
+    assert definition is not None
+
+
 def test_get_plot_definition_supports_both_compatible_analysis_names() -> None:
     verification_definition = get_plot_definition(
         "cross_analysis_fleetwide",
@@ -28,6 +34,21 @@ def test_get_plot_definition_supports_both_compatible_analysis_names() -> None:
     )
     frequency_definition = get_plot_definition(
         "cross_analysis_fleetwide",
+        analysis_name="LifetimeDesignFrequencies",
+    )
+
+    assert verification_definition is not None
+    assert frequency_definition is not None
+    assert verification_definition is frequency_definition
+
+
+def test_get_plot_definition_supports_asset_plot_compatible_analysis_names() -> None:
+    verification_definition = get_plot_definition(
+        "cross_analysis_asset",
+        analysis_name="LifetimeDesignVerification",
+    )
+    frequency_definition = get_plot_definition(
+        "cross_analysis_asset",
         analysis_name="LifetimeDesignFrequencies",
     )
 

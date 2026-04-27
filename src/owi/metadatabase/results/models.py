@@ -219,7 +219,7 @@ class ResultQuery(BaseModel):
         if self.site_id is not None:
             filters["site"] = self.site_id
         if self.location_id is not None:
-            filters["location"] = self.location_id
+            filters["location__id"] = self.location_id
         if self.short_description is not None:
             filters["short_description"] = self.short_description
         if self.turbine is not None:

@@ -90,6 +90,24 @@ plot = service.plot_results(
 display(plot.notebook)
 ```
 
+### Cross-analysis Asset Plot
+
+Asset-level overlay combining verification points over time with dashed
+frequency reference levels. Use shared filters such as `location_id` to
+scope the plot for an asset page.
+
+```python
+plot = service.plot_results(
+    plot_type="cross_analysis_asset",
+    filters={"location_id": 123},
+    source_filters={
+        "frequency": {"analysis_id": 46},
+        "verification": {"analysis_id": 50},
+    },
+)
+display(plot.notebook)
+```
+
 ### Histogram Plot
 
 Bar chart for binned data (e.g. `WindSpeedHistogram`):

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from .definitions import PlotDefinition
-from .frequency_verification import build_frequency_verification_plot_definition
+from .frequency_verification import (
+    build_frequency_verification_asset_plot_definition,
+    build_frequency_verification_plot_definition,
+)
 
 _registry: dict[str, PlotDefinition] = {}
 
@@ -31,3 +34,4 @@ def get_plot_definition(plot_type: str | None, analysis_name: str | None = None)
 
 
 register_plot_definition(build_frequency_verification_plot_definition())
+register_plot_definition(build_frequency_verification_asset_plot_definition())

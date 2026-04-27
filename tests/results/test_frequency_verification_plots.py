@@ -5,7 +5,10 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from owi.metadatabase.results.plotting.frequency_verification import plot_frequency_verification_comparison
+from owi.metadatabase.results.plotting.frequency_verification import (
+    plot_frequency_verification_asset_history,
+    plot_frequency_verification_comparison,
+)
 
 
 def _sample_frequency_verification_frame() -> pd.DataFrame:
@@ -85,6 +88,11 @@ def _sample_frequency_verification_frame() -> pd.DataFrame:
     )
 
 
+def _sample_asset_frequency_verification_frame() -> pd.DataFrame:
+    frame = _sample_frequency_verification_frame()
+    return frame[frame["asset"] == "WFA03"].reset_index(drop=True)
+
+
 class TestFrequencyVerificationComparisonPlot:
     def test_empty_data_raises(self) -> None:
         empty = pd.DataFrame(columns=["asset", "metric", "y"])
@@ -147,3 +155,69 @@ class TestFrequencyVerificationComparisonPlot:
         assert "params.seriesName" in reference_series["tooltip"]["formatter"]
         assert "<strong>' + value[0] + '</strong>'" in verification_series["tooltip"]["formatter"]
         assert "Timestamp:" in verification_series["tooltip"]["formatter"]
+
+
+class TestFrequencyVerificationAssetHistoryPlot:
+    def test_returns_metric_dropdown_without_asset_dropdown(self) -> None:
+        response = plot_frequency_verification_asset_history(_sample_asset_frequency_verification_frame())
+
+        assert response.frontend_spec is not None
+        assert response.frontend_spec["mode"] == "dropdown"
+        assert len(response.frontend_spec["controls"]) == 1
+        assert response.frontend_spec["controls"][0]["label"] == "Metric"
+        assert set(response.frontend_spec["options_by_key"]) == {"FA1"}
+
+    def test_uses_datetime_axis_ordered_oldest_to_newest(self) -> None:
+        response = plot_frequency_verification_asset_history(_sample_asset_frequency_verification_frame())
+        assert response.frontend_spec is not None
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+
+        assert fa1_chart["xAxis"][0]["data"] == [
+            "2024-01-01T00:00:00+00:00",
+            "2024-01-10T00:00:00+00:00",
+        ]
+        assert fa1_chart["xAxis"][0]["name"] == "Datetime"
+
+    def test_frequency_series_are_dashed_horizontal_levels_with_fleetwide_colors(self) -> None:
+        response = plot_frequency_verification_asset_history(_sample_asset_frequency_verification_frame())
+        assert response.frontend_spec is not None
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+
+        assert fa1_chart["legend"][0]["data"] == ["Ref 1", "Ref 2", "Ref 3"]
+        reference_series = next(series for series in fa1_chart["series"] if series["name"] == "Ref 1")
+
+        assert reference_series["type"] == "line"
+        assert reference_series["lineStyle"]["type"] == "dashed"
+        assert reference_series["lineStyle"]["color"] == "#1f77b4"
+        assert [point[0] for point in reference_series["data"]] == [
+            "2024-01-01T00:00:00+00:00",
+            "2024-01-10T00:00:00+00:00",
+        ]
+        assert [point[1] for point in reference_series["data"]] == [2.4123, 2.4123]
+
+    def test_verification_series_keeps_marker_style_without_opacity_scaling(self) -> None:
+        response = plot_frequency_verification_asset_history(_sample_asset_frequency_verification_frame())
+        assert response.frontend_spec is not None
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+
+        verification_series = next(series for series in fa1_chart["series"] if series["name"] == "Verification")
+        opacities = [point["itemStyle"]["opacity"] for point in verification_series["data"]]
+
+        assert verification_series["type"] == "scatter"
+        assert verification_series["symbolSize"] == 8
+        assert verification_series["itemStyle"]["color"] == "#d62728"
+        assert opacities == [1.0, 1.0]
+
+    def test_verification_hover_keeps_asset_frequency_and_timestamp_content(self) -> None:
+        response = plot_frequency_verification_asset_history(_sample_asset_frequency_verification_frame())
+        assert response.frontend_spec is not None
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+        verification_series = next(series for series in fa1_chart["series"] if series["name"] == "Verification")
+
+        assert "<strong>' + value[2] + '</strong>'" in verification_series["tooltip"]["formatter"]
+        assert "Frequency:" in verification_series["tooltip"]["formatter"]
+        assert "Timestamp:" in verification_series["tooltip"]["formatter"]
+
+    def test_requires_single_asset_after_filtering(self) -> None:
+        with pytest.raises(ValueError, match="expects data for one asset"):
+            plot_frequency_verification_asset_history(_sample_frequency_verification_frame())

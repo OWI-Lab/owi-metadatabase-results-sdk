@@ -496,6 +496,77 @@ def test_results_service_plot_results_supports_cross_analysis_fleetwide_without_
     assert [query.location_id for query in repository.queries] == [9, 9]
 
 
+def test_results_service_plot_results_supports_cross_analysis_asset_without_analysis_name() -> None:
+    frequency_analysis = LifetimeDesignFrequencies()
+    verification_analysis = LifetimeDesignVerification()
+    repository = MultiAnalysisRepository(
+        {
+            "LifetimeDesignFrequencies": pd.DataFrame(
+                [
+                    series.to_record_payload(analysis_id=17)
+                    for series in frequency_analysis.to_results(
+                        {
+                            "rows": [
+                                {
+                                    "turbine": "WFA03",
+                                    "reference": "INFL",
+                                    "FA1": 2.4123,
+                                    "location_id": 9,
+                                }
+                            ]
+                        }
+                    )
+                ]
+            ),
+            "LifetimeDesignVerification": pd.DataFrame(
+                [
+                    series.to_record_payload(analysis_id=19)
+                    for series in verification_analysis.to_results(
+                        {
+                            "rows": [
+                                {
+                                    "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
+                                    "turbine": "WFA03",
+                                    "FA1": 2.6631,
+                                    "location_id": 9,
+                                },
+                                {
+                                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                                    "turbine": "WFA03",
+                                    "FA1": 2.5517,
+                                    "location_id": 9,
+                                },
+                            ]
+                        }
+                    )
+                ]
+            ),
+        }
+    )
+    service = ResultsService(repository=repository)
+
+    response = service.plot_results(
+        filters={"location_id": 9},
+        plot_type="cross_analysis_asset",
+        source_filters={
+            "frequency": {"analysis_id": 17},
+            "verification": {"analysis_id": 19},
+        },
+    )
+    options = json.loads(response.json_options)
+
+    assert options["FA1"]["xAxis"][0]["data"] == [
+        "2024-01-01T00:00:00+00:00",
+        "2024-01-02T00:00:00+00:00",
+    ]
+    assert [query.analysis_name for query in repository.queries] == [
+        "LifetimeDesignFrequencies",
+        "LifetimeDesignVerification",
+    ]
+    assert [query.analysis_id for query in repository.queries] == [17, 19]
+    assert [query.location_id for query in repository.queries] == [9, 9]
+
+
 def test_results_service_plot_results_cross_analysis_requires_source_filters_for_ambiguous_analysis_id() -> None:
     service = ResultsService(repository=MultiAnalysisRepository({}))
 

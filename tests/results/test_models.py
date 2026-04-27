@@ -267,7 +267,7 @@ class TestResultQuery:
     def test_to_backend_filters_includes_location_id(self) -> None:
         query = ResultQuery(location_id=5)
         filters = query.to_backend_filters()
-        assert filters["location"] == 5
+        assert filters["location__id"] == 5
 
     def test_to_backend_filters_includes_short_description(self) -> None:
         query = ResultQuery(short_description="test")
