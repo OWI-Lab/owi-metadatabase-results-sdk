@@ -63,6 +63,13 @@ class TestComparisonPlot:
         assert "Metric" in response.html
         options = json.loads(response.json_options)
         assert "FA1" in options
+        chart_options = options["FA1"]
+        assert chart_options["dataZoom"][0]["type"] == "inside"
+        toolbox_feature = chart_options["toolbox"]["feature"]
+        assert list(toolbox_feature) == ["dataZoom", "restore", "saveAsImage"]
+        assert toolbox_feature["dataZoom"]["show"] is True
+        assert toolbox_feature["restore"]["show"] is True
+        assert toolbox_feature["saveAsImage"]["type"] == "png"
 
 
 class TestByLocationPlot:
@@ -98,3 +105,7 @@ class TestGeoPlot:
         options = json.loads(response.json_options)
         assert "FA1" in options
         assert "INFL" in options["FA1"]
+        toolbox_feature = options["FA1"]["INFL"]["toolbox"]["feature"]
+        assert list(toolbox_feature) == ["restore", "saveAsImage"]
+        assert toolbox_feature["restore"]["show"] is True
+        assert toolbox_feature["saveAsImage"]["type"] == "png"

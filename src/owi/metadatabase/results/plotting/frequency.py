@@ -12,7 +12,9 @@ from pyecharts.globals import ChartType
 
 from .response import build_dropdown_plot_response, build_nested_dropdown_plot_response
 from .theme import (
+    _apply_cartesian_interactions,
     _apply_cartesian_layout,
+    _apply_export_reset_toolbox,
     _label_opts,
     _legend_opts,
     _title_opts,
@@ -84,6 +86,7 @@ def plot_lifetime_design_frequencies_comparison(
             yaxis_opts=_yaxis_opts(name="Frequency [Hz]"),
         )
         _apply_cartesian_layout(chart)
+        _apply_cartesian_interactions(chart)
         charts[str(metric)] = chart
     return build_dropdown_plot_response(charts, dropdown_label="Metric")
 
@@ -121,6 +124,7 @@ def plot_lifetime_design_frequencies_by_location(
             yaxis_opts=_yaxis_opts(name="Frequency [Hz]"),
         )
         _apply_cartesian_layout(chart)
+        _apply_cartesian_interactions(chart)
         charts[str(metric)] = chart
     return build_dropdown_plot_response(charts, dropdown_label="Metric")
 
@@ -187,6 +191,7 @@ def plot_lifetime_design_frequencies_geo(
                     precision=2,
                 ),
             )
+            _apply_export_reset_toolbox(chart)
             charts[str(metric)][str(reference)] = chart
     return build_nested_dropdown_plot_response(
         charts,

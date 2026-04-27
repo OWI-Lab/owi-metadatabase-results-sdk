@@ -12,7 +12,9 @@ from .strategies import (
 )
 from .theme import (
     MONOSPACE_FONT_FAMILY,
+    _apply_cartesian_interactions,
     _apply_cartesian_layout,
+    _apply_export_reset_toolbox,
     _apply_monospace_theme,
     _label_opts,
     _legend_opts,
@@ -28,7 +30,9 @@ __all__ = [
     "PLOT_STRATEGIES",
     "HistogramPlotStrategy",
     "TimeSeriesPlotStrategy",
+    "_apply_cartesian_interactions",
     "_apply_cartesian_layout",
+    "_apply_export_reset_toolbox",
     "_apply_monospace_theme",
     "_label_opts",
     "_legend_opts",

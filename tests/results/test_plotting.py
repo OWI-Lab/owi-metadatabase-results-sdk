@@ -83,6 +83,19 @@ class TestHistogramPlotStrategy:
         assert response.html
         options = json.loads(response.json_options)
         assert "series" in options
+        assert options["yAxis"][0]["scale"] is True
+        assert options["dataZoom"][0]["type"] == "inside"
+        assert options["dataZoom"][0]["start"] == 0
+        assert options["dataZoom"][0]["end"] == 100
+        assert options["dataZoom"][0]["moveOnMouseMove"] is True
+        assert options["dataZoom"][1]["type"] == "slider"
+        toolbox_feature = options["toolbox"]["feature"]
+        assert list(toolbox_feature) == ["dataZoom", "restore", "saveAsImage"]
+        assert toolbox_feature["dataZoom"]["title"] == {"zoom": "Zoom", "back": "Reset Zoom"}
+        assert toolbox_feature["restore"]["show"] is True
+        assert toolbox_feature["saveAsImage"]["type"] == "png"
+        assert toolbox_feature["saveAsImage"]["title"] == "Download as PNG"
+        assert toolbox_feature["dataZoom"]["show"] is True
         assert response.frontend_spec is not None
         assert response.frontend_spec["renderer"] == "echarts"
         assert response.frontend_spec["mode"] == "single"

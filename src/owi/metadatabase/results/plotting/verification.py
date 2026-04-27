@@ -10,6 +10,7 @@ from pyecharts.charts import Line
 
 from .response import build_dropdown_plot_response
 from .theme import (
+    _apply_cartesian_interactions,
     _apply_cartesian_layout,
     _label_opts,
     _legend_opts,
@@ -55,6 +56,7 @@ def plot_verification_time_series(data: pd.DataFrame) -> Any:
             yaxis_opts=_yaxis_opts(name="Frequency [Hz]"),
         )
         _apply_cartesian_layout(chart)
+        _apply_cartesian_interactions(chart)
         charts[str(metric)] = chart
     return build_dropdown_plot_response(charts, dropdown_label="Metric")
 
@@ -94,5 +96,6 @@ def plot_verification_comparison(data: pd.DataFrame) -> Any:
             yaxis_opts=_yaxis_opts(name="Frequency [Hz]"),
         )
         _apply_cartesian_layout(chart)
+        _apply_cartesian_interactions(chart)
         charts[str(turbine)] = chart
     return build_dropdown_plot_response(charts, dropdown_label="Turbine")

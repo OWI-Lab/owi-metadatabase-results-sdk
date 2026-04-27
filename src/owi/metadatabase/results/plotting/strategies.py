@@ -11,6 +11,7 @@ from pyecharts.charts import Bar, Line
 from ..models import PlotRequest, PlotResponse
 from .response import _build_plot_response
 from .theme import (
+    _apply_cartesian_interactions,
     _apply_cartesian_layout,
     _label_opts,
     _legend_opts,
@@ -54,6 +55,7 @@ class HistogramPlotStrategy:
             yaxis_opts=_yaxis_opts(name="Value"),
         )
         _apply_cartesian_layout(chart)
+        _apply_cartesian_interactions(chart)
         return _build_plot_response(chart)
 
 
@@ -88,6 +90,7 @@ class TimeSeriesPlotStrategy:
             yaxis_opts=_yaxis_opts(name="Value"),
         )
         _apply_cartesian_layout(chart)
+        _apply_cartesian_interactions(chart)
         return _build_plot_response(chart)
 
 

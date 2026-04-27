@@ -10,6 +10,7 @@ from pyecharts.charts import Line
 
 from .response import build_dropdown_plot_response
 from .theme import (
+    _apply_cartesian_interactions,
     _apply_cartesian_layout,
     _label_opts,
     _legend_opts,
@@ -57,5 +58,6 @@ def plot_ceit_analyses(data: pd.DataFrame) -> Any:
             yaxis_opts=_yaxis_opts(name="Value"),
         )
         _apply_cartesian_layout(chart)
+        _apply_cartesian_interactions(chart)
         charts[str(sensor_identifier)] = chart
     return build_dropdown_plot_response(charts, dropdown_label="Sensor")
