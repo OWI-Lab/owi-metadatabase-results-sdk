@@ -629,10 +629,12 @@ def _build_plot_response(chart: ChartLike) -> PlotResponse:
     """Build a response with both embedded HTML and notebook-native output."""
     _apply_monospace_theme(chart)
     json_options = _chart_json_options(chart)
+    html = chart.render_embed()
+    frame_height = _parse_pixel_height(str(getattr(chart, "height", "") or "420px"))
     return PlotResponse(
         chart=chart,
-        notebook=_render_notebook(chart),
-        html=chart.render_embed(),
+        notebook=_build_iframe_notebook_html(html, frame_height=frame_height) or _render_notebook(chart),
+        html=html,
         json_options=json_options,
         frontend_spec=_build_single_frontend_spec(chart),
     )

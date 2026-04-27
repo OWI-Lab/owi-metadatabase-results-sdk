@@ -88,6 +88,8 @@ class TestHistogramPlotStrategy:
         assert response.frontend_spec["mode"] == "single"
         assert response.frontend_spec["controls"] == []
         assert "series" in response.frontend_spec["option"]
+        assert response.notebook is not None
+        assert "ResizeObserver" in response.notebook.data
 
     def test_render_nan_bin_right(self) -> None:
         strategy = HistogramPlotStrategy()
