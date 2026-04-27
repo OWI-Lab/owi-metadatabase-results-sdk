@@ -130,6 +130,7 @@ class TestTimeSeriesPlotStrategy:
         assert isinstance(response, PlotResponse)
         options = json.loads(response.json_options)
         assert options["title"][0]["text"] == "Custom Title"
+        assert options["xAxis"][0]["boundaryGap"] is True
         assert response.frontend_spec is not None
         assert response.frontend_spec["mode"] == "single"
         assert response.frontend_spec["option"]["title"][0]["text"] == "Custom Title"
@@ -141,6 +142,21 @@ class TestTimeSeriesPlotStrategy:
         response = strategy.render(data, request)
         options = json.loads(response.json_options)
         assert options["title"][0]["text"] == "MyAnalysis"
+
+    def test_render_uses_no_boundary_gap_for_dense_series(self) -> None:
+        strategy = TimeSeriesPlotStrategy()
+        data = pd.DataFrame(
+            [
+                {"series_name": "S1", "x": "2024-01-01", "y": 1.0},
+                {"series_name": "S1", "x": "2024-01-02", "y": 2.0},
+                {"series_name": "S1", "x": "2024-01-03", "y": 3.0},
+                {"series_name": "S1", "x": "2024-01-04", "y": 4.0},
+            ]
+        )
+        request = PlotRequest(analysis_name="MyAnalysis")
+        response = strategy.render(data, request)
+        options = json.loads(response.json_options)
+        assert options["xAxis"][0]["boundaryGap"] is False
 
 
 class TestGetPlotStrategy:

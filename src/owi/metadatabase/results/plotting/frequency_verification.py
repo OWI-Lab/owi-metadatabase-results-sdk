@@ -414,7 +414,7 @@ def _build_frequency_verification_asset_chart(
         title_opts=opts.TitleOpts(is_show=False),
         legend_opts=_legend_opts(),
         tooltip_opts=_tooltip_opts(trigger="item"),
-        xaxis_opts=_xaxis_opts(name="Datetime", rotate=30, boundary_gap=False),
+        xaxis_opts=_xaxis_opts(name="Datetime", rotate=30, boundary_gap=1 <= len(x_values) <= 3),
         yaxis_opts=_yaxis_opts(name="Frequency [Hz]"),
     )
     _set_line_legend(chart, line_series_names)

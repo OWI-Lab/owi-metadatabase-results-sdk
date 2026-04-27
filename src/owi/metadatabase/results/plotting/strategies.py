@@ -86,7 +86,7 @@ class TimeSeriesPlotStrategy:
             title_opts=_title_opts(request.title or request.analysis_name),
             legend_opts=_legend_opts(),
             tooltip_opts=_tooltip_opts(trigger="axis"),
-            xaxis_opts=_xaxis_opts(name="Time / Axis", boundary_gap=False),
+            xaxis_opts=_xaxis_opts(name="Time / Axis", boundary_gap=1 <= len(x_values) <= 3),
             yaxis_opts=_yaxis_opts(name="Value"),
         )
         _apply_cartesian_layout(chart)

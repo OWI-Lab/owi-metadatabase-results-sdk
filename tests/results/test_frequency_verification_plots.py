@@ -177,6 +177,7 @@ class TestFrequencyVerificationAssetHistoryPlot:
             "2024-01-10T00:00:00+00:00",
         ]
         assert fa1_chart["xAxis"][0]["name"] == "Datetime"
+        assert fa1_chart["xAxis"][0]["boundaryGap"] is True
 
     def test_frequency_series_are_dashed_horizontal_levels_with_fleetwide_colors(self) -> None:
         response = plot_frequency_verification_asset_history(_sample_asset_frequency_verification_frame())

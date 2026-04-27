@@ -52,7 +52,7 @@ def plot_verification_time_series(data: pd.DataFrame) -> Any:
             title_opts=_title_opts(f"Verification Time-Series ({metric})"),
             legend_opts=_legend_opts(),
             tooltip_opts=_tooltip_opts(trigger="axis"),
-            xaxis_opts=_xaxis_opts(name="Timestamp", boundary_gap=False),
+            xaxis_opts=_xaxis_opts(name="Timestamp", boundary_gap=1 <= len(x_values) <= 3),
             yaxis_opts=_yaxis_opts(name="Frequency [Hz]"),
         )
         _apply_cartesian_layout(chart)
@@ -92,7 +92,7 @@ def plot_verification_comparison(data: pd.DataFrame) -> Any:
             title_opts=_title_opts(f"Verification Comparison ({turbine})"),
             legend_opts=_legend_opts(),
             tooltip_opts=_tooltip_opts(trigger="axis"),
-            xaxis_opts=_xaxis_opts(name="Timestamp", boundary_gap=False),
+            xaxis_opts=_xaxis_opts(name="Timestamp", boundary_gap=1 <= len(x_values) <= 3),
             yaxis_opts=_yaxis_opts(name="Frequency [Hz]"),
         )
         _apply_cartesian_layout(chart)

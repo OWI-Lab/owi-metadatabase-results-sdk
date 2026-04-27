@@ -124,6 +124,39 @@ def test_lifetime_design_verification_to_results() -> None:
     assert results[0].location_id == 5
 
 
+def test_results_service_plot_results_supports_verification_sparse_boundary_gap() -> None:
+    analysis = LifetimeDesignVerification()
+    results = analysis.to_results(
+        {
+            "rows": [
+                {
+                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                    "turbine": "WFA03",
+                    "FA1": 0.356,
+                    "location_id": 5,
+                },
+                {
+                    "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
+                    "turbine": "WFA03",
+                    "FA1": 0.355,
+                    "location_id": 5,
+                },
+            ]
+        }
+    )
+    frame = pd.DataFrame([series.to_record_payload(analysis_id=19) for series in results])
+    service = ResultsService(repository=StubRepository(frame))
+
+    time_series_response = service.plot_results("LifetimeDesignVerification", plot_type="time_series")
+    comparison_response = service.plot_results("LifetimeDesignVerification", plot_type="comparison")
+
+    time_series_options = json.loads(time_series_response.json_options)
+    comparison_options = json.loads(comparison_response.json_options)
+
+    assert time_series_options["FA1"]["xAxis"][0]["boundaryGap"] is True
+    assert comparison_options["WFA03"]["xAxis"][0]["boundaryGap"] is True
+
+
 def test_results_service_get_results() -> None:
     analysis = WindSpeedHistogram()
     series = analysis.to_results(
