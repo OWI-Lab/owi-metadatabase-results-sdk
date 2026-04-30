@@ -12,13 +12,13 @@
         <meta name="author" content="Pietro D'Antuono">
       
       
-        <link rel="canonical" href="https://owi-lab.github.io/owi-metadatabase-results-sdk/tutorials/lifetime-design-frequencies/">
+        <link rel="canonical" href="https://owi-lab.github.io/owi-metadatabase-results-sdk/tutorials/wind-speed-histogram/">
       
       
-        <link rel="prev" href="../first-query/">
+        <link rel="prev" href="../lifetime-design-verification/">
       
       
-        <link rel="next" href="../lifetime-design-verification/">
+        <link rel="next" href="../ceit-corrosion-monitoring/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Lifetime Design Frequencies Workflow - OWI Metadatabase Results Extension</title>
+        <title>Wind Speed Histogram Workflow - OWI Metadatabase Results Extension</title>
       
     
     
@@ -85,7 +85,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#lifetime-design-frequencies-workflow" class="md-skip">
+        <a href="#wind-speed-histogram-workflow" class="md-skip">
           Skip to content
         </a>
       
@@ -118,7 +118,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Lifetime Design Frequencies Workflow
+              Wind Speed Histogram Workflow
             
           </span>
         </div>
@@ -516,13 +516,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <a href="././" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../lifetime-design-frequencies/" class="md-nav__link">
         
   
   
@@ -538,7 +535,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -576,10 +572,13 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../wind-speed-histogram/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -595,6 +594,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -1952,13 +1952,14 @@
   
 
 
-<h1 id="lifetime-design-frequencies-workflow">Lifetime Design Frequencies Workflow<a class="headerlink" href="#lifetime-design-frequencies-workflow" title="Permanent link">&para;</a></h1>
+<h1 id="wind-speed-histogram-workflow">Wind Speed Histogram Workflow<a class="headerlink" href="#wind-speed-histogram-workflow" title="Permanent link">&para;</a></h1>
 <div class="admonition example">
 <p class="admonition-title">Example</p>
-<p>This tutorial walks through the complete <code>LifetimeDesignFrequencies</code> lifecycle:
-import workbook data, upload results to the backend, retrieve them, and render
-interactive plots — all as explicit, auditable steps.</p>
+<p>This tutorial walks through the complete <code>WindSpeedHistogram</code> lifecycle:
+load histogram data from a workbook, upload results to the backend,
+retrieve them, and render an interactive histogram plot — all as explicit,</p>
 </div>
+<p>auditable steps.</p>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Python 3.9+</li>
@@ -1982,18 +1983,17 @@ interactive plots — all as explicit, auditable steps.</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">display</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.geometry.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">GeometryAPI</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.locations.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">LocationsAPI</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results</span><span class="w"> </span><span class="kn">import</span> <span class="n">LifetimeDesignFrequencies</span><span class="p">,</span> <span class="n">ResultsAPI</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnalysisDefinition</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results.serializers</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">DjangoAnalysisSerializer</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">DjangoResultSerializer</span><span class="p">,</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">)</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results.services</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApiResultsRepository</span><span class="p">,</span> <span class="n">ResultsService</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_token_from_env_file</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.geometry.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">GeometryAPI</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.locations.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">LocationsAPI</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results</span><span class="w"> </span><span class="kn">import</span> <span class="n">ResultsAPI</span><span class="p">,</span> <span class="n">WindSpeedHistogram</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">AnalysisDefinition</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results.serializers</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">DjangoAnalysisSerializer</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">DjangoResultSerializer</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results.services</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApiResultsRepository</span><span class="p">,</span> <span class="n">ResultsService</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_token_from_env_file</span>
 </span></code></pre></div>
 <hr />
 <h2 id="step-2-configure-runtime-constants">Step 2 — Configure Runtime Constants<a class="headerlink" href="#step-2-configure-runtime-constants" title="Permanent link">&para;</a></h2>
@@ -2014,9 +2014,8 @@ interactive plots — all as explicit, auditable steps.</p>
 </span></code></pre></div>
 <hr />
 <h2 id="step-3-resolve-project-and-location-metadata">Step 3 — Resolve Project and Location Metadata<a class="headerlink" href="#step-3-resolve-project-and-location-metadata" title="Permanent link">&para;</a></h2>
-<p>Before reading the workbook, resolve the backend ids for the target
-project site, model definition, asset locations, and any existing
-analysis for the chosen timestamp.</p>
+<p>Before reading the workbook, resolve the backend identifiers for the
+target project site, model definition, and asset locations.</p>
 <pre class="mermaid"><code>%%{init: {'theme': 'base', 'themeVariables': {
   'fontSize': 'small',
   'lineColor': '#4B5563',
@@ -2045,7 +2044,7 @@ graph TD
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">locations_api</span> <span class="o">=</span> <span class="n">LocationsAPI</span><span class="p">(</span><span class="n">api_root</span><span class="o">=</span><span class="n">BASE_URL</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">TOKEN</span><span class="p">)</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">geometry_api</span> <span class="o">=</span> <span class="n">GeometryAPI</span><span class="p">(</span><span class="n">api_root</span><span class="o">=</span><span class="n">BASE_URL</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">TOKEN</span><span class="p">)</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">results_api</span> <span class="o">=</span> <span class="n">ResultsAPI</span><span class="p">(</span><span class="n">api_root</span><span class="o">=</span><span class="n">BASE_URL</span><span class="p">,</span> <span class="n">token</span><span class="o">=</span><span class="n">TOKEN</span><span class="p">)</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">analysis</span> <span class="o">=</span> <span class="n">LifetimeDesignFrequencies</span><span class="p">()</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">analysis</span> <span class="o">=</span> <span class="n">WindSpeedHistogram</span><span class="p">()</span>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">analysis_serializer</span> <span class="o">=</span> <span class="n">DjangoAnalysisSerializer</span><span class="p">()</span>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">result_serializer</span> <span class="o">=</span> <span class="n">DjangoResultSerializer</span><span class="p">()</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">results_service</span> <span class="o">=</span> <span class="n">ResultsService</span><span class="p">(</span>
@@ -2093,8 +2092,8 @@ graph TD
 </span></code></pre></div>
 <hr />
 <h2 id="step-4-load-and-inspect-the-workbook-data">Step 4 — Load and Inspect the Workbook Data<a class="headerlink" href="#step-4-load-and-inspect-the-workbook-data" title="Permanent link">&para;</a></h2>
-<p>Read the Excel sheet and identify the frequency columns (those ending
-with <code>[Hz]</code>) that will feed the analysis workflow.</p>
+<p>Read the Excel sheet and identify the histogram bin columns (those
+starting with <code>[</code>) that define the wind speed bins.</p>
 <pre class="mermaid"><code>%%{init: {'theme': 'base', 'themeVariables': {
   'fontSize': 'small',
   'lineColor': '#4B5563',
@@ -2103,9 +2102,9 @@ with <code>[Hz]</code>) that will feed the analysis workflow.</p>
 }}}%%
 graph TD
     A["Workbook sheet"] --&gt; B["Read Excel data"]
-    B --&gt; C["frequency_frame"]
-    C --&gt; D["Detect metric columns"]
-    D --&gt; E["metric_columns"]
+    B --&gt; C["histogram_frame"]
+    C --&gt; D["Detect histogram bin columns"]
+    D --&gt; E["bin_columns"]
     C --&gt; F["Workbook preview"]
     E --&gt; G["Workbook data ready"]
     F --&gt; G
@@ -2117,21 +2116,33 @@ graph TD
     class B api;
     class C,E,F,G keep;
     class A,D build;</code></pre>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">sheet_name</span> <span class="o">=</span> <span class="s2">&quot;Lifetime -  Design frequencies&quot;</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">frequency_frame</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_excel</span><span class="p">(</span><span class="n">WORKBOOK</span><span class="p">,</span> <span class="n">sheet_name</span><span class="o">=</span><span class="n">sheet_name</span><span class="p">)</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Detect columns like &quot;FA1 [Hz]&quot;, &quot;SS1 [Hz]&quot; and strip the unit suffix.</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">metric_columns</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="nb">str</span><span class="p">(</span><span class="n">col</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; [Hz]&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">):</span> <span class="n">col</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">frequency_frame</span><span class="o">.</span><span class="n">columns</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">col</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot; [Hz]&quot;</span><span class="p">)</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">}</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">_parse_bin_edges</span><span class="p">(</span><span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract left and right edges from a bin label like &#39;[0,1[&#39;.&quot;&quot;&quot;</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">numbers</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="nb">float</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;-?\d+(?:\.\d+)?&quot;</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="p">]</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">numbers</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>            <span class="sa">f</span><span class="s2">&quot;Could not parse histogram bin edges from </span><span class="si">{</span><span class="n">label</span><span class="si">!r}</span><span class="s2">.&quot;</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>        <span class="p">)</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="k">return</span> <span class="n">numbers</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">numbers</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="n">sheet_name</span> <span class="o">=</span> <span class="s2">&quot;Lifetime - Wind Histogram&quot;</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="n">histogram_frame</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_excel</span><span class="p">(</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="n">WORKBOOK</span><span class="p">,</span> <span class="n">sheet_name</span><span class="o">=</span><span class="n">sheet_name</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="mi">1</span>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="p">)</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="n">bin_columns</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">histogram_frame</span><span class="o">.</span><span class="n">columns</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">col</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;[&quot;</span><span class="p">)</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="p">]</span>
 </span></code></pre></div>
 <hr />
 <h2 id="step-5-build-and-upload-the-shared-analysis">Step 5 — Build and Upload the Shared Analysis<a class="headerlink" href="#step-5-build-and-upload-the-shared-analysis" title="Permanent link">&para;</a></h2>
-<p>Build the shared analysis payload, prepare the workbook rows as typed
-result series, serialize the payloads, and persist them through
-<code>ResultsAPI</code>.</p>
+<p>Build the shared analysis payload, prepare each workbook row as a typed
+histogram result series with parsed bin edges, serialize the payloads,
+and persist them through <code>ResultsAPI</code>.</p>
 <p>When <code>CREATE_NEW_ANALYSIS</code> is <code>True</code>, a new analysis row is created.
 When <code>False</code>, the existing timestamped analysis is reused. The same
 applies for <code>UPLOAD_RESULTS</code> and the result rows.</p>
@@ -2147,23 +2158,24 @@ graph TD
     B -- no --&gt; D["Reuse the existing analysis id"]
     C --&gt; E["Selected analysis id"]
     D --&gt; E
-    E --&gt; F["Build prepared_rows and result_series"]
-    F --&gt; G["Serialize result payloads"]
-    G --&gt; H{"Upload result rows?"}
-    H -- yes --&gt; I["Bulk create or update location rows"]
-    H -- no --&gt; J["Skip writes"]
-    I --&gt; K["Upload summary"]
-    J --&gt; K
+    E --&gt; F["Parse bins and build prepared_rows"]
+    F --&gt; G["Create result_series"]
+    G --&gt; H["Serialize result payloads"]
+    H --&gt; I{"Upload result rows?"}
+    I -- yes --&gt; J["Bulk create or update histogram rows"]
+    I -- no --&gt; K["Skip writes"]
+    J --&gt; L["Upload summary"]
+    K --&gt; L
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
     classDef decision fill:#F7D9D1,stroke:#C04A2F,color:#5A1F14;
 
-    class C,I api;
-    class D,E,K keep;
-    class A,F,G,J build;
-    class B,H decision;</code></pre>
+    class C,J api;
+    class D,E,L keep;
+    class A,F,G,H,K build;
+    class B,I decision;</code></pre>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># -- Analysis definition</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">analysis_definition</span> <span class="o">=</span> <span class="n">AnalysisDefinition</span><span class="p">(</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">name</span><span class="o">=</span><span class="n">analysis</span><span class="o">.</span><span class="n">analysis_name</span><span class="p">,</span>
@@ -2172,7 +2184,7 @@ graph TD
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">source_type</span><span class="o">=</span><span class="s2">&quot;json&quot;</span><span class="p">,</span>
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">source</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">WORKBOOK</span><span class="p">),</span>
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">timestamp</span><span class="o">=</span><span class="n">ANALYSIS_TIMESTAMP</span><span class="p">,</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Shared lifetime design frequencies upload.&quot;</span><span class="p">,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Shared wind speed histogram upload.&quot;</span><span class="p">,</span>
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">additional_data</span><span class="o">=</span><span class="p">{</span>
 </span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="s2">&quot;input_file&quot;</span><span class="p">:</span> <span class="n">WORKBOOK</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
 </span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>        <span class="s2">&quot;sheet_name&quot;</span><span class="p">:</span> <span class="n">sheet_name</span><span class="p">,</span>
@@ -2187,36 +2199,42 @@ graph TD
 </span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="k">else</span><span class="p">:</span>
 </span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>    <span class="n">analysis_id</span> <span class="o">=</span> <span class="n">existing_analysis_id</span>
 </span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>
-</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="c1"># -- Prepare rows and convert to typed ResultSeries</span>
+</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="c1"># -- Prepare rows with parsed bin edges and scope-dependent location ids</span>
 </span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="n">prepared_rows</span> <span class="o">=</span> <span class="p">[</span>
 </span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>    <span class="p">{</span>
-</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>        <span class="s2">&quot;turbine&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;Turbine&quot;</span><span class="p">]),</span>
-</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>        <span class="s2">&quot;reference&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;Reference&quot;</span><span class="p">]),</span>
-</span><span id="__span-4-29"><a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>        <span class="s2">&quot;site_id&quot;</span><span class="p">:</span> <span class="n">site_id</span><span class="p">,</span>
-</span><span id="__span-4-30"><a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>        <span class="s2">&quot;location_id&quot;</span><span class="p">:</span> <span class="n">location_title_to_id_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;Turbine&quot;</span><span class="p">])),</span>
-</span><span id="__span-4-31"><a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a>        <span class="o">**</span><span class="p">{</span>
-</span><span id="__span-4-32"><a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a>            <span class="n">metric</span><span class="p">:</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">source_column</span><span class="p">)</span>
-</span><span id="__span-4-33"><a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a>            <span class="k">for</span> <span class="n">metric</span><span class="p">,</span> <span class="n">source_column</span> <span class="ow">in</span> <span class="n">metric_columns</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
-</span><span id="__span-4-34"><a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a>        <span class="p">},</span>
-</span><span id="__span-4-35"><a id="__codelineno-4-35" name="__codelineno-4-35" href="#__codelineno-4-35"></a>    <span class="p">}</span>
-</span><span id="__span-4-36"><a id="__codelineno-4-36" name="__codelineno-4-36" href="#__codelineno-4-36"></a>    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">frequency_frame</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">orient</span><span class="o">=</span><span class="s2">&quot;records&quot;</span><span class="p">)</span>
-</span><span id="__span-4-37"><a id="__codelineno-4-37" name="__codelineno-4-37" href="#__codelineno-4-37"></a><span class="p">]</span>
-</span><span id="__span-4-38"><a id="__codelineno-4-38" name="__codelineno-4-38" href="#__codelineno-4-38"></a><span class="n">result_series</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">to_results</span><span class="p">({</span><span class="s2">&quot;rows&quot;</span><span class="p">:</span> <span class="n">prepared_rows</span><span class="p">})</span>
-</span><span id="__span-4-39"><a id="__codelineno-4-39" name="__codelineno-4-39" href="#__codelineno-4-39"></a>
-</span><span id="__span-4-40"><a id="__codelineno-4-40" name="__codelineno-4-40" href="#__codelineno-4-40"></a><span class="c1"># -- Serialize and upload</span>
-</span><span id="__span-4-41"><a id="__codelineno-4-41" name="__codelineno-4-41" href="#__codelineno-4-41"></a><span class="n">results_payloads</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-4-42"><a id="__codelineno-4-42" name="__codelineno-4-42" href="#__codelineno-4-42"></a>    <span class="n">result_serializer</span><span class="o">.</span><span class="n">to_payload</span><span class="p">(</span><span class="n">series</span><span class="p">,</span> <span class="n">analysis_id</span><span class="o">=</span><span class="n">analysis_id</span><span class="p">)</span>
-</span><span id="__span-4-43"><a id="__codelineno-4-43" name="__codelineno-4-43" href="#__codelineno-4-43"></a>    <span class="k">for</span> <span class="n">series</span> <span class="ow">in</span> <span class="n">result_series</span>
-</span><span id="__span-4-44"><a id="__codelineno-4-44" name="__codelineno-4-44" href="#__codelineno-4-44"></a><span class="p">]</span>
-</span><span id="__span-4-45"><a id="__codelineno-4-45" name="__codelineno-4-45" href="#__codelineno-4-45"></a><span class="k">if</span> <span class="n">UPLOAD_RESULTS</span><span class="p">:</span>
-</span><span id="__span-4-46"><a id="__codelineno-4-46" name="__codelineno-4-46" href="#__codelineno-4-46"></a>    <span class="n">upload_result</span> <span class="o">=</span> <span class="n">results_api</span><span class="o">.</span><span class="n">create_or_update_results_bulk</span><span class="p">(</span>
-</span><span id="__span-4-47"><a id="__codelineno-4-47" name="__codelineno-4-47" href="#__codelineno-4-47"></a>        <span class="n">results_payloads</span>
-</span><span id="__span-4-48"><a id="__codelineno-4-48" name="__codelineno-4-48" href="#__codelineno-4-48"></a>    <span class="p">)</span>
+</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>        <span class="s2">&quot;title&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;Title&quot;</span><span class="p">]),</span>
+</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>        <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="n">row</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;Description&quot;</span><span class="p">),</span>
+</span><span id="__span-4-29"><a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>        <span class="s2">&quot;scope_label&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;Scope&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span>
+</span><span id="__span-4-30"><a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>        <span class="s2">&quot;site_id&quot;</span><span class="p">:</span> <span class="n">site_id</span><span class="p">,</span>
+</span><span id="__span-4-31"><a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a>        <span class="s2">&quot;location_id&quot;</span><span class="p">:</span> <span class="p">(</span>
+</span><span id="__span-4-32"><a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a>            <span class="kc">None</span>
+</span><span id="__span-4-33"><a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a>            <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;Scope&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Site&quot;</span>
+</span><span id="__span-4-34"><a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a>            <span class="k">else</span> <span class="n">location_title_to_id_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+</span><span id="__span-4-35"><a id="__codelineno-4-35" name="__codelineno-4-35" href="#__codelineno-4-35"></a>                <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;Scope&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+</span><span id="__span-4-36"><a id="__codelineno-4-36" name="__codelineno-4-36" href="#__codelineno-4-36"></a>            <span class="p">)</span>
+</span><span id="__span-4-37"><a id="__codelineno-4-37" name="__codelineno-4-37" href="#__codelineno-4-37"></a>        <span class="p">),</span>
+</span><span id="__span-4-38"><a id="__codelineno-4-38" name="__codelineno-4-38" href="#__codelineno-4-38"></a>        <span class="s2">&quot;bins&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">_parse_bin_edges</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">col</span><span class="p">))</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">bin_columns</span><span class="p">],</span>
+</span><span id="__span-4-39"><a id="__codelineno-4-39" name="__codelineno-4-39" href="#__codelineno-4-39"></a>        <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">col</span><span class="p">])</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">bin_columns</span><span class="p">],</span>
+</span><span id="__span-4-40"><a id="__codelineno-4-40" name="__codelineno-4-40" href="#__codelineno-4-40"></a>        <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;sheet_scope&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;Scope&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">strip</span><span class="p">()},</span>
+</span><span id="__span-4-41"><a id="__codelineno-4-41" name="__codelineno-4-41" href="#__codelineno-4-41"></a>    <span class="p">}</span>
+</span><span id="__span-4-42"><a id="__codelineno-4-42" name="__codelineno-4-42" href="#__codelineno-4-42"></a>    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">histogram_frame</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">orient</span><span class="o">=</span><span class="s2">&quot;records&quot;</span><span class="p">)</span>
+</span><span id="__span-4-43"><a id="__codelineno-4-43" name="__codelineno-4-43" href="#__codelineno-4-43"></a><span class="p">]</span>
+</span><span id="__span-4-44"><a id="__codelineno-4-44" name="__codelineno-4-44" href="#__codelineno-4-44"></a><span class="n">result_series</span> <span class="o">=</span> <span class="n">analysis</span><span class="o">.</span><span class="n">to_results</span><span class="p">({</span><span class="s2">&quot;series&quot;</span><span class="p">:</span> <span class="n">prepared_rows</span><span class="p">})</span>
+</span><span id="__span-4-45"><a id="__codelineno-4-45" name="__codelineno-4-45" href="#__codelineno-4-45"></a>
+</span><span id="__span-4-46"><a id="__codelineno-4-46" name="__codelineno-4-46" href="#__codelineno-4-46"></a><span class="c1"># -- Serialize and upload</span>
+</span><span id="__span-4-47"><a id="__codelineno-4-47" name="__codelineno-4-47" href="#__codelineno-4-47"></a><span class="n">results_payloads</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-4-48"><a id="__codelineno-4-48" name="__codelineno-4-48" href="#__codelineno-4-48"></a>    <span class="n">result_serializer</span><span class="o">.</span><span class="n">to_payload</span><span class="p">(</span><span class="n">series</span><span class="p">,</span> <span class="n">analysis_id</span><span class="o">=</span><span class="n">analysis_id</span><span class="p">)</span>
+</span><span id="__span-4-49"><a id="__codelineno-4-49" name="__codelineno-4-49" href="#__codelineno-4-49"></a>    <span class="k">for</span> <span class="n">series</span> <span class="ow">in</span> <span class="n">result_series</span>
+</span><span id="__span-4-50"><a id="__codelineno-4-50" name="__codelineno-4-50" href="#__codelineno-4-50"></a><span class="p">]</span>
+</span><span id="__span-4-51"><a id="__codelineno-4-51" name="__codelineno-4-51" href="#__codelineno-4-51"></a><span class="k">if</span> <span class="n">UPLOAD_RESULTS</span><span class="p">:</span>
+</span><span id="__span-4-52"><a id="__codelineno-4-52" name="__codelineno-4-52" href="#__codelineno-4-52"></a>    <span class="n">upload_result</span> <span class="o">=</span> <span class="n">results_api</span><span class="o">.</span><span class="n">create_or_update_results_bulk</span><span class="p">(</span>
+</span><span id="__span-4-53"><a id="__codelineno-4-53" name="__codelineno-4-53" href="#__codelineno-4-53"></a>        <span class="n">results_payloads</span>
+</span><span id="__span-4-54"><a id="__codelineno-4-54" name="__codelineno-4-54" href="#__codelineno-4-54"></a>    <span class="p">)</span>
 </span></code></pre></div>
 <hr />
 <h2 id="step-6-retrieve-and-reconstruct">Step 6 — Retrieve and Reconstruct<a class="headerlink" href="#step-6-retrieve-and-reconstruct" title="Permanent link">&para;</a></h2>
 <p>Read the persisted result rows back from the API and reconstruct the
-normalized analysis frame.</p>
+normalized histogram dataframe.</p>
 <pre class="mermaid"><code>%%{init: {'theme': 'base', 'themeVariables': {
   'fontSize': 'small',
   'lineColor': '#4B5563',
@@ -2227,7 +2245,7 @@ graph TD
     A["Selected analysis id"] --&gt; B["Read saved result rows"]
     B --&gt; C["Raw backend table"]
     C --&gt; D["Convert rows back to result series"]
-    D --&gt; E["Rebuild the lifetime design dataframe"]
+    D --&gt; E["Rebuild the histogram dataframe"]
     E --&gt; F["Retrieved dataframe ready"]
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
@@ -2249,7 +2267,7 @@ graph TD
 </span></code></pre></div>
 <hr />
 <h2 id="step-7-plot-the-results">Step 7 — Plot the Results<a class="headerlink" href="#step-7-plot-the-results" title="Permanent link">&para;</a></h2>
-<p>The <code>ResultsService</code> provides three plot types for this analysis:</p>
+<p>The <code>ResultsService</code> provides a histogram plot type for this analysis.</p>
 <table>
 <thead>
 <tr>
@@ -2259,16 +2277,8 @@ graph TD
 </thead>
 <tbody>
 <tr>
-<td><code>comparison</code></td>
-<td>Metrics across references with a location dropdown.</td>
-</tr>
-<tr>
-<td><code>location</code></td>
-<td>Values grouped by turbine with a metric dropdown.</td>
-</tr>
-<tr>
-<td><code>geo</code></td>
-<td>Results projected onto a geographic site map.</td>
+<td><code>histogram</code></td>
+<td>Bin distribution for each series, with site or turbine scope.</td>
 </tr>
 </tbody>
 </table>
@@ -2279,68 +2289,48 @@ graph TD
   'clusterBorder': '#CBD5E1'
 }}}%%
 graph TD
-    A["Selected analysis id"] --&gt; B["Create comparison plot"]
-    A --&gt; C["Create location plot"]
-    A --&gt; D["Create geo plot"]
-    B --&gt; E["Comparison widget"]
-    C --&gt; F["Location widget"]
-    D --&gt; G["Geo widget"]
-    E --&gt; H["Display plots"]
-    F --&gt; H
-    G --&gt; H
+    A["Selected analysis id"] --&gt; B["Create histogram plot"]
+    B --&gt; C["Histogram widget"]
+    C --&gt; D["Display plot"]
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
 
-    class B,C,D api;
-    class E,F,G,H keep;
+    class B api;
+    class C,D keep;
     class A build;</code></pre>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">filters</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">:</span> <span class="n">analysis_id</span><span class="p">}</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">comparison_plot</span> <span class="o">=</span> <span class="n">results_service</span><span class="o">.</span><span class="n">plot_results</span><span class="p">(</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">histogram_plot</span> <span class="o">=</span> <span class="n">results_service</span><span class="o">.</span><span class="n">plot_results</span><span class="p">(</span>
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">analysis</span><span class="o">.</span><span class="n">analysis_name</span><span class="p">,</span>
 </span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">filters</span><span class="o">=</span><span class="n">filters</span><span class="p">,</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;comparison&quot;</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;histogram&quot;</span><span class="p">,</span>
 </span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="p">)</span>
 </span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">location_plot</span> <span class="o">=</span> <span class="n">results_service</span><span class="o">.</span><span class="n">plot_results</span><span class="p">(</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="n">analysis</span><span class="o">.</span><span class="n">analysis_name</span><span class="p">,</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="n">filters</span><span class="o">=</span><span class="n">filters</span><span class="p">,</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;location&quot;</span><span class="p">,</span>
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="p">)</span>
-</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="n">geo_plot</span> <span class="o">=</span> <span class="n">results_service</span><span class="o">.</span><span class="n">plot_results</span><span class="p">(</span>
-</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    <span class="n">analysis</span><span class="o">.</span><span class="n">analysis_name</span><span class="p">,</span>
-</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>    <span class="n">filters</span><span class="o">=</span><span class="n">filters</span><span class="p">,</span>
-</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;geo&quot;</span><span class="p">,</span>
-</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a><span class="p">)</span>
-</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>
-</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a><span class="c1"># Display in a notebook environment.</span>
-</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="n">display</span><span class="p">(</span><span class="n">comparison_plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
-</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="n">display</span><span class="p">(</span><span class="n">location_plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
-</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="n">display</span><span class="p">(</span><span class="n">geo_plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="c1"># Display in a notebook environment.</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="n">display</span><span class="p">(</span><span class="n">histogram_plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
 </span></code></pre></div>
 <hr />
 <h2 id="what-you-learned">What You Learned<a class="headerlink" href="#what-you-learned" title="Permanent link">&para;</a></h2>
 <ul>
 <li>How to resolve project metadata through <code>LocationsAPI</code> and <code>GeometryAPI</code>.</li>
-<li>How to prepare workbook data and serialize it into backend-compatible
-  payloads using <code>AnalysisDefinition</code> and <code>DjangoResultSerializer</code>.</li>
+<li>How to parse histogram bin labels into numeric edge pairs.</li>
+<li>How to prepare histogram data with scope-dependent location ids and
+  serialize it into backend-compatible payloads.</li>
 <li>How to conditionally create or reuse analyses and upload result rows
   with <code>create_or_update_results_bulk</code>.</li>
-<li>How to retrieve and reconstruct typed result series from persisted data.</li>
-<li>How to render comparison, location, and geo plots through
-  <code>ResultsService</code>.</li>
+<li>How to retrieve and reconstruct typed histogram series from persisted data.</li>
+<li>How to render histogram plots through <code>ResultsService</code>.</li>
 </ul>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="../lifetime-design-frequencies/">Lifetime Design Frequencies Workflow</a> —
+  the upload-retrieve-plot cycle for design frequency data.</li>
 <li><a href="../lifetime-design-verification/">Lifetime Design Verification Workflow</a> —
-  the same upload-retrieve-plot cycle for design verification data.</li>
+  the same cycle for design verification data.</li>
 <li><a href="../../reference/query-examples/analyses/">Reference: Analysis Queries</a> —
   Django ORM examples for the <code>Analysis</code> model.</li>
-<li><a href="../../explanation/architecture/">Explanation: Architecture</a> —
-  understand the design patterns behind the SDK.</li>
 </ul>
 
 
@@ -2379,7 +2369,7 @@ graph TD
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../first-query/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Your First Results Query">
+          <a href="../lifetime-design-verification/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Lifetime Design Verification Workflow">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
@@ -2389,20 +2379,20 @@ graph TD
                 Previous
               </span>
               <div class="md-ellipsis">
-                Your First Results Query
+                Lifetime Design Verification Workflow
               </div>
             </div>
           </a>
         
         
           
-          <a href="../lifetime-design-verification/" class="md-footer__link md-footer__link--next" aria-label="Next: Lifetime Design Verification Workflow">
+          <a href="../ceit-corrosion-monitoring/" class="md-footer__link md-footer__link--next" aria-label="Next: CEIT Corrosion Monitoring Workflow">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Lifetime Design Verification Workflow
+                CEIT Corrosion Monitoring Workflow
               </div>
             </div>
             <div class="md-footer__button md-icon">

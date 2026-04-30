@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/favicon.png">
-      <meta name="generator" content="zensical-0.0.29">
+      <meta name="generator" content="zensical-0.0.30">
     
     
       
@@ -36,7 +36,7 @@
       
         
       
-      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.6f2fbb28.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.3b031116.min.css">
       
         
           
@@ -537,6 +537,90 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/lifetime-design-verification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lifetime Design Verification Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/wind-speed-histogram/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wind Speed Histogram Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/ceit-corrosion-monitoring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CEIT Corrosion Monitoring Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -695,30 +779,6 @@
   
     <li class="md-nav__item md-nav__item--active">
       
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Upload Results
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
       <a href="././" class="md-nav__link md-nav__link--active">
         
   
@@ -735,70 +795,6 @@
   
 
       </a>
-      
-        
-
-
-<nav class="md-nav md-nav--secondary" aria-label="On this page">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#create-an-analysis" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Create an Analysis
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#upload-result-rows" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upload Result Rows
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#upload-a-single-row" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upload a Single Row
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#skipping-rows-without-resolved-locations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Skipping Rows Without Resolved Locations
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
       
     </li>
   
@@ -1794,6 +1790,12 @@
               
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
+                  
+                    <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                    <div class="md-sidebar-button__wrapper">
+                      <label class="md-sidebar-button" for="__toc"></label>
+                    </div>
+                  
                   <div class="md-sidebar__inner">
                     
 
@@ -1855,6 +1857,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#create-or-update-results-in-bulk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create or Update Results in Bulk
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1902,7 +1915,8 @@ backend through <code>ResultsAPI</code>.</p>
 </span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created analysis: </span><span class="si">{</span><span class="n">analysis_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="upload-result-rows">Upload Result Rows<a class="headerlink" href="#upload-result-rows" title="Permanent link">&para;</a></h2>
-<p>Each result payload maps to a single <code>Result</code> row in the backend.</p>
+<p>Each result payload maps to a single <code>Result</code> row in the backend.
+<code>ResultsAPI.create_results_bulk(...)</code> renders a <code>tqdm</code> progress bar automatically.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">owi.metadatabase.results.serializers</span><span class="w"> </span><span class="kn">import</span> <span class="n">DjangoResultSerializer</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">result_serializer</span> <span class="o">=</span> <span class="n">DjangoResultSerializer</span><span class="p">()</span>
@@ -1921,8 +1935,10 @@ backend through <code>ResultsAPI</code>.</p>
 <h2 id="upload-a-single-row">Upload a Single Row<a class="headerlink" href="#upload-a-single-row" title="Permanent link">&para;</a></h2>
 <p>If bulk upload is not supported by the target backend, the SDK can also
 create results one at a time:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">for</span> <span class="n">payload</span> <span class="ow">in</span> <span class="n">payloads</span><span class="p">:</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">api</span><span class="o">.</span><span class="n">create_result</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tqdm.auto</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">for</span> <span class="n">payload</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">payloads</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Uploading result rows&quot;</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;row&quot;</span><span class="p">):</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">api</span><span class="o">.</span><span class="n">create_result</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="skipping-rows-without-resolved-locations">Skipping Rows Without Resolved Locations<a class="headerlink" href="#skipping-rows-without-resolved-locations" title="Permanent link">&para;</a></h2>
 <p>When working with location-scoped results, filter out rows where the
@@ -1930,6 +1946,47 @@ turbine name could not be mapped to a backend location id:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">upload_payloads</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">payloads</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;location&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">api</span><span class="o">.</span><span class="n">create_results_bulk</span><span class="p">(</span><span class="n">upload_payloads</span><span class="p">)</span>
 </span></code></pre></div>
+<h2 id="create-or-update-results-in-bulk">Create or Update Results in Bulk<a class="headerlink" href="#create-or-update-results-in-bulk" title="Permanent link">&para;</a></h2>
+<p>When re-uploading data that may partially overlap with existing backend
+rows, use <code>create_or_update_results_bulk</code>. The method matches rows within
+the same analysis by their <code>short_description</code> and either creates or
+patches each one accordingly.</p>
+<p>Every payload <strong>must</strong> include both <code>analysis</code> (the analysis id) and
+<code>short_description</code> keys:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">payloads</span> <span class="o">=</span> <span class="p">[</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="p">{</span><span class="s2">&quot;analysis&quot;</span><span class="p">:</span> <span class="n">analysis_id</span><span class="p">,</span> <span class="s2">&quot;short_description&quot;</span><span class="p">:</span> <span class="s2">&quot;BBA01 - FA1&quot;</span><span class="p">,</span> <span class="s2">&quot;name_col1&quot;</span><span class="p">:</span> <span class="s2">&quot;frequency&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">},</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="p">{</span><span class="s2">&quot;analysis&quot;</span><span class="p">:</span> <span class="n">analysis_id</span><span class="p">,</span> <span class="s2">&quot;short_description&quot;</span><span class="p">:</span> <span class="s2">&quot;BBA02 - FA1&quot;</span><span class="p">,</span> <span class="s2">&quot;name_col1&quot;</span><span class="p">:</span> <span class="s2">&quot;frequency&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">},</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">]</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">result</span> <span class="o">=</span> <span class="n">api</span><span class="o">.</span><span class="n">create_or_update_results_bulk</span><span class="p">(</span><span class="n">payloads</span><span class="p">)</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">])</span>  <span class="c1"># list of {analysis, short_description, result_id, action}</span>
+</span></code></pre></div>
+<p>The returned <code>summary</code> list indicates the <code>action</code> taken for each row:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>created</code></td>
+<td>No matching row existed; a new row was inserted.</td>
+</tr>
+<tr>
+<td><code>updated</code></td>
+<td>An existing row with the same <code>short_description</code> was patched.</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Ambiguous matches</p>
+<p>If the backend already contains <strong>multiple</strong> rows with the same
+<code>short_description</code> for a given analysis, the call raises
+<code>InvalidParameterError</code> to avoid silent data corruption.
+Resolve the duplicates on the backend first, then retry.</p>
+</div>
 
 
 
@@ -2068,7 +2125,7 @@ turbine name could not be mapped to a backend location id:</p>
       <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["navigation.instant","navigation.tracking","navigation.tabs","navigation.sections","navigation.expand","navigation.top","navigation.footer","toc.follow","search.suggest","search.highlight","search.share","content.code.copy","content.code.annotate"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.c2b142ea.min.js"></script>
+      <script src="../../assets/javascripts/bundle.66be65ca.min.js"></script>
       
     
   </body>
