@@ -149,8 +149,8 @@ class TestLifetimeDesignFrequencies:
         assert results[0].data_additional["reference_labels"] == ["INFL", "ACTU"]
 
     def test_split_series_description(self) -> None:
-        turbine, metric = LifetimeDesignFrequencies._split_series_description("BBA01 - FA1")
-        assert turbine == "BBA01"
+        turbine, metric = LifetimeDesignFrequencies._split_series_description("WFA03 - FA1")
+        assert turbine == "WFA03"
         assert metric == "FA1"
 
     def test_split_series_description_no_separator(self) -> None:

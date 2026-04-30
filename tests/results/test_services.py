@@ -60,6 +60,19 @@ class StubLocationRepository(StubRepository):
         return pd.DataFrame(result)
 
 
+class MultiAnalysisRepository(StubRepository):
+    """Repository stub that returns different result frames per analysis name."""
+
+    def __init__(self, frames_by_analysis: dict[str, pd.DataFrame]) -> None:
+        super().__init__(pd.DataFrame())
+        self.frames_by_analysis = frames_by_analysis
+        self.queries: list[Any] = []
+
+    def list_results(self, query: Any) -> pd.DataFrame:
+        self.queries.append(query)
+        return self.frames_by_analysis.get(query.analysis_name, pd.DataFrame())
+
+
 def test_wind_speed_histogram_to_results_and_plot() -> None:
     analysis = WindSpeedHistogram()
     results = analysis.to_results(
@@ -92,14 +105,14 @@ def test_lifetime_design_verification_to_results() -> None:
             "rows": [
                 {
                     "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "FA1": 0.356,
                     "SS1": 0.357,
                     "location_id": 5,
                 },
                 {
                     "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "FA1": 0.355,
                     "SS1": 0.356,
                     "location_id": 5,
@@ -151,7 +164,7 @@ def test_results_service_deserialize_result_series_from_dataframe() -> None:
                 "name_col3": None,
                 "units_col3": None,
                 "value_col3": [],
-                "short_description": "BBA01 - FA1",
+                "short_description": "WFA03 - FA1",
                 "description": None,
                 "data_additional": {
                     "analysis_kind": "comparison",
@@ -176,14 +189,14 @@ def test_results_service_get_result_series_fetches_typed_results() -> None:
         {
             "rows": [
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "INFL",
                     "FA1": 0.3406,
                     "SS1": 0.3407,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "ACTU",
                     "FA1": 0.3330,
                     "SS1": 0.3332,
@@ -198,7 +211,7 @@ def test_results_service_get_result_series_fetches_typed_results() -> None:
     retrieved = service.get_result_series("LifetimeDesignFrequencies", filters={"analysis_id": 17})
 
     assert len(retrieved) == 2
-    assert all(series.short_description.startswith("BBA01") for series in retrieved)
+    assert all(series.short_description.startswith("WFA03") for series in retrieved)
 
 
 def test_results_service_get_location_frame_filters_requested_ids() -> None:
@@ -207,8 +220,8 @@ def test_results_service_get_location_frame_filters_requested_ids() -> None:
             pd.DataFrame(),
             pd.DataFrame(
                 [
-                    {"id": 9, "title": "BBA01", "northing": 51.5, "easting": 2.8},
-                    {"id": 10, "title": "BBA02", "northing": 51.6, "easting": 2.9},
+                    {"id": 9, "title": "WFA03", "northing": 51.5, "easting": 2.8},
+                    {"id": 10, "title": "WFB07", "northing": 51.6, "easting": 2.9},
                 ]
             ),
         )
@@ -235,14 +248,14 @@ def test_lifetime_design_frequencies_to_results() -> None:
         {
             "rows": [
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "INFL",
                     "FA1": 0.3406,
                     "SS1": 0.3407,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "ACTU",
                     "FA1": 0.3330,
                     "SS1": 0.3332,
@@ -268,14 +281,14 @@ def test_lifetime_design_frequencies_plot_uses_reference_legend() -> None:
         {
             "rows": [
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "INFL",
                     "FA1": 0.3406,
                     "SS1": 0.3407,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "ACTU",
                     "FA1": 0.3330,
                     "SS1": 0.3332,
@@ -300,14 +313,14 @@ def test_results_service_plot_results_supports_geo_plot_type() -> None:
         {
             "rows": [
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "INFL",
                     "FA1": 0.3406,
                     "SS1": 0.3407,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "ACTU",
                     "FA1": 0.3330,
                     "SS1": 0.3332,
@@ -319,7 +332,7 @@ def test_results_service_plot_results_supports_geo_plot_type() -> None:
     frame = pd.DataFrame([series.to_record_payload(analysis_id=17) for series in results])
     location_frame = pd.DataFrame(
         [
-            {"id": 9, "title": "BBA01", "northing": 51.5, "easting": 2.8},
+            {"id": 9, "title": "WFA03", "northing": 51.5, "easting": 2.8},
         ]
     )
     service = ResultsService(repository=StubLocationRepository(frame, location_frame))
@@ -332,34 +345,199 @@ def test_results_service_plot_results_supports_geo_plot_type() -> None:
     assert options["FA1"]["INFL"]["legend"][0]["show"] is False
 
 
+def test_results_service_plot_results_supports_cross_analysis_fleetwide_compatibility_mode() -> None:
+    frequency_analysis = LifetimeDesignFrequencies()
+    verification_analysis = LifetimeDesignVerification()
+    frequency_results = frequency_analysis.to_results(
+        {
+            "rows": [
+                {
+                    "turbine": "WFA03",
+                    "reference": "INFL",
+                    "FA1": 2.4123,
+                    "location_id": 9,
+                },
+                {
+                    "turbine": "WFA03",
+                    "reference": "ACTU",
+                    "FA1": 1.9184,
+                    "location_id": 9,
+                },
+                {
+                    "turbine": "WFB07",
+                    "reference": "INFL",
+                    "FA1": 2.1038,
+                    "location_id": 10,
+                },
+                {
+                    "turbine": "WFB07",
+                    "reference": "ACTU",
+                    "FA1": 1.4472,
+                    "location_id": 10,
+                },
+            ]
+        }
+    )
+    verification_results = verification_analysis.to_results(
+        {
+            "rows": [
+                {
+                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                    "turbine": "WFA03",
+                    "FA1": 2.5517,
+                    "location_id": 9,
+                },
+                {
+                    "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
+                    "turbine": "WFB07",
+                    "FA1": 2.2746,
+                    "location_id": 10,
+                },
+            ]
+        }
+    )
+    repository = MultiAnalysisRepository(
+        {
+            "LifetimeDesignFrequencies": pd.DataFrame(
+                [series.to_record_payload(analysis_id=17) for series in frequency_results]
+            ),
+            "LifetimeDesignVerification": pd.DataFrame(
+                [series.to_record_payload(analysis_id=19) for series in verification_results]
+            ),
+        }
+    )
+    service = ResultsService(repository=repository)
+
+    response = service.plot_results(
+        "LifetimeDesignVerification",
+        filters={"analysis_id": 999},
+        plot_type="cross_analysis_fleetwide",
+    )
+    options = json.loads(response.json_options)
+
+    assert "FA1" in options
+    assert options["FA1"]["xAxis"][0]["data"] == ["WFA03", "WFB07"]
+    assert options["FA1"]["legend"][0]["data"] == ["INFL", "ACTU"]
+    assert [series["name"] for series in options["FA1"]["series"]] == ["INFL", "ACTU", "Verification"]
+    assert [query.analysis_name for query in repository.queries] == [
+        "LifetimeDesignFrequencies",
+        "LifetimeDesignVerification",
+    ]
+    assert repository.queries[0].analysis_id is None
+    assert repository.queries[1].analysis_id == 999
+
+
+def test_results_service_plot_results_supports_cross_analysis_fleetwide_without_analysis_name() -> None:
+    frequency_analysis = LifetimeDesignFrequencies()
+    verification_analysis = LifetimeDesignVerification()
+    repository = MultiAnalysisRepository(
+        {
+            "LifetimeDesignFrequencies": pd.DataFrame(
+                [
+                    series.to_record_payload(analysis_id=17)
+                    for series in frequency_analysis.to_results(
+                        {
+                            "rows": [
+                                {
+                                    "turbine": "WFA03",
+                                    "reference": "INFL",
+                                    "FA1": 2.4123,
+                                    "location_id": 9,
+                                },
+                                {
+                                    "turbine": "WFA03",
+                                    "reference": "ACTU",
+                                    "FA1": 1.9184,
+                                    "location_id": 9,
+                                },
+                            ]
+                        }
+                    )
+                ]
+            ),
+            "LifetimeDesignVerification": pd.DataFrame(
+                [
+                    series.to_record_payload(analysis_id=19)
+                    for series in verification_analysis.to_results(
+                        {
+                            "rows": [
+                                {
+                                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                                    "turbine": "WFA03",
+                                    "FA1": 2.5517,
+                                    "location_id": 9,
+                                }
+                            ]
+                        }
+                    )
+                ]
+            ),
+        }
+    )
+    service = ResultsService(repository=repository)
+
+    response = service.plot_results(
+        filters={"location_id": 9},
+        plot_type="cross_analysis_fleetwide",
+        source_filters={
+            "frequency": {"analysis_id": 17},
+            "verification": {"analysis_id": 19},
+        },
+    )
+    options = json.loads(response.json_options)
+
+    assert "FA1" in options
+    assert options["FA1"]["legend"][0]["data"] == ["INFL", "ACTU"]
+    assert [query.analysis_name for query in repository.queries] == [
+        "LifetimeDesignFrequencies",
+        "LifetimeDesignVerification",
+    ]
+    assert [query.analysis_id for query in repository.queries] == [17, 19]
+    assert [query.location_id for query in repository.queries] == [9, 9]
+
+
+def test_results_service_plot_results_cross_analysis_requires_source_filters_for_ambiguous_analysis_id() -> None:
+    service = ResultsService(repository=MultiAnalysisRepository({}))
+
+    try:
+        service.plot_results(
+            filters={"analysis_id": 999},
+            plot_type="cross_analysis_fleetwide",
+        )
+    except ValueError as exc:
+        assert "source_filters" in str(exc)
+    else:
+        raise AssertionError("Expected cross-analysis plot request with ambiguous analysis_id to fail.")
+
+
 def test_results_service_comparison_and_location_plots_are_distinct() -> None:
     analysis = LifetimeDesignFrequencies()
     results = analysis.to_results(
         {
             "rows": [
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "INFL",
                     "FA1": 0.3406,
                     "SS1": 0.3407,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA01",
+                    "turbine": "WFA03",
                     "reference": "ACTU",
                     "FA1": 0.3330,
                     "SS1": 0.3332,
                     "location_id": 9,
                 },
                 {
-                    "turbine": "BBA02",
+                    "turbine": "WFB07",
                     "reference": "INFL",
                     "FA1": 0.3201,
                     "SS1": 0.3204,
                     "location_id": 10,
                 },
                 {
-                    "turbine": "BBA02",
+                    "turbine": "WFB07",
                     "reference": "ACTU",
                     "FA1": 0.3111,
                     "SS1": 0.3114,
@@ -371,8 +549,8 @@ def test_results_service_comparison_and_location_plots_are_distinct() -> None:
     frame = pd.DataFrame([series.to_record_payload(analysis_id=17) for series in results])
     location_frame = pd.DataFrame(
         [
-            {"id": 9, "title": "BBA01", "northing": 51.5, "easting": 2.8},
-            {"id": 10, "title": "BBA02", "northing": 51.6, "easting": 2.9},
+            {"id": 9, "title": "WFA03", "northing": 51.5, "easting": 2.8},
+            {"id": 10, "title": "WFB07", "northing": 51.6, "easting": 2.9},
         ]
     )
     service = ResultsService(repository=StubLocationRepository(frame, location_frame))
@@ -383,8 +561,8 @@ def test_results_service_comparison_and_location_plots_are_distinct() -> None:
     location_options = json.loads(location_response.json_options)
 
     assert comparison_options["FA1"]["xAxis"][0]["data"] == ["INFL", "ACTU"]
-    assert location_options["FA1"]["xAxis"][0]["data"] == ["BBA01", "BBA02"]
-    assert [series["name"] for series in comparison_options["FA1"]["series"]] == ["BBA01", "BBA02"]
+    assert location_options["FA1"]["xAxis"][0]["data"] == ["WFA03", "WFB07"]
+    assert [series["name"] for series in comparison_options["FA1"]["series"]] == ["WFA03", "WFB07"]
     assert [series["name"] for series in location_options["FA1"]["series"]] == ["ACTU", "INFL"]
 
 
@@ -404,7 +582,7 @@ def test_django_result_serializer_ignores_empty_third_vector() -> None:
             "name_col3": None,
             "units_col3": None,
             "value_col3": [],
-            "short_description": "BBA01 - FA1",
+            "short_description": "WFA03 - FA1",
             "description": None,
             "data_additional": {
                 "analysis_kind": "comparison",
@@ -432,7 +610,7 @@ def test_django_result_serializer_reads_json_data_additional() -> None:
             "name_col3": None,
             "units_col3": None,
             "value_col3": None,
-            "short_description": "BBA01 - FA1",
+            "short_description": "WFA03 - FA1",
             "description": None,
             "data_additional": json.dumps(
                 {
@@ -559,7 +737,7 @@ class TestPlotContext:
                 ResultVector(name="y", unit="v", values=[2.0]),
             ],
         )
-        location_frame = pd.DataFrame([{"id": 9, "title": "BBA01", "northing": 51, "easting": 2}])
+        location_frame = pd.DataFrame([{"id": 9, "title": "WFA03", "northing": 51, "easting": 2}])
         service = ResultsService(
             repository=StubLocationRepository(pd.DataFrame(), location_frame),
         )

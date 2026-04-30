@@ -22,9 +22,12 @@ owi.metadatabase.results
 │   ├── wind_speed_histogram.py
 │   └── ceit.py        # CEIT sensor data handling
 ├── plotting/          # Visualization layer
-│   ├── strategies.py  # PlotStrategyProtocol implementations
+│   ├── strategies.py  # Generic single-analysis plot strategies
+│   ├── definitions.py # Cross-analysis plot definition types
+│   ├── registry.py    # Registered cross-analysis plot definitions
 │   ├── theme.py       # Chart styling
 │   ├── frequency.py   # Frequency-specific plotters
+│   ├── frequency_verification.py # Cross-analysis fleetwide plot
 │   ├── ceit.py        # CEIT-specific plotters
 │   └── response.py    # Response builders (notebook, HTML, JSON)
 └── services/          # High-level service facade
@@ -57,9 +60,21 @@ class LifetimeDesignFrequencies(BaseAnalysis):
 
 ### Strategy Pattern
 
-Plot rendering is delegated to `PlotStrategyProtocol` implementations
-(e.g. `HistogramPlotStrategy`, `TimeSeriesPlotStrategy`). The analysis
-chooses a strategy by name, and `get_plot_strategy()` resolves it.
+Generic single-analysis rendering is delegated to
+`PlotStrategyProtocol` implementations (e.g. `HistogramPlotStrategy`,
+`TimeSeriesPlotStrategy`). The analysis chooses a strategy by name, and
+`get_plot_strategy()` resolves it. Analyses with plot-specific behavior
+can still bypass the generic strategies and call dedicated plotting
+modules directly.
+
+### Registered Plot Definitions
+
+Cross-analysis plots are registered separately from analyses through the
+plotting registry. A `PlotDefinition` declares the supported analysis
+names, the named source queries required by the plot, and the renderer
+used after those sources are fetched and normalized. `ResultsService`
+resolves these definitions by `plot_type` before it falls back to the
+ordinary single-analysis plotting path.
 
 ### Adapter Pattern
 
@@ -76,9 +91,9 @@ registry, and serialization logic. Users call `get_results()` or
 ### Protocol-driven Contracts
 
 The SDK defines runtime-checkable protocols (`ResultProtocol`,
-`PlotStrategyProtocol`, `AnalysisProtocol`, `ResultsRepositoryProtocol`,
-`QueryServiceProtocol`) to enforce structural typing without requiring
-inheritance.
+`PlotStrategyProtocol`, `AnalysisProtocol`, `PlotDefinitionProtocol`,
+`ResultsRepositoryProtocol`, `QueryServiceProtocol`) to enforce
+structural typing without requiring inheritance.
 
 ## Request Lifecycle
 
@@ -114,6 +129,10 @@ sequenceDiagram
 6. **Analysis** reconstructs the normalized computation frame from the
    result series.
 7. **User** receives a clean pandas DataFrame.
+
+For cross-analysis plots, the service follows the same repository and
+deserialization flow, but fans out across multiple named sources before
+passing the normalized source frames to the registered plot definition.
 
 ## Return Value Conventions
 

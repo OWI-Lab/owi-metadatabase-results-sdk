@@ -260,9 +260,9 @@ class TestResultQuery:
         assert filters["additional_data__timestamp_from"].startswith("2024-01-01")
 
     def test_to_backend_filters_includes_turbine(self) -> None:
-        query = ResultQuery(turbine="BBA01")
+        query = ResultQuery(turbine="WFA03")
         filters = query.to_backend_filters()
-        assert filters["additional_data__turbine"] == "BBA01"
+        assert filters["additional_data__turbine"] == "WFA03"
 
     def test_to_backend_filters_includes_location_id(self) -> None:
         query = ResultQuery(location_id=5)
