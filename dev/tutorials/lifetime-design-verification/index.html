@@ -2259,7 +2259,7 @@ graph TD
 </span></code></pre></div>
 <hr />
 <h2 id="step-7-plot-the-results">Step 7 — Plot the Results<a class="headerlink" href="#step-7-plot-the-results" title="Permanent link">&para;</a></h2>
-<p>The <code>ResultsService</code> provides two plot types for this analysis:</p>
+<p>The <code>ResultsService</code> provides three plot types relevant to this workflow:</p>
 <table>
 <thead>
 <tr>
@@ -2276,8 +2276,14 @@ graph TD
 <td><code>comparison</code></td>
 <td>Metric values compared across turbines or grouped series.</td>
 </tr>
+<tr>
+<td><code>cross_analysis_fleetwide</code></td>
+<td>Fleetwide overlay combining persisted verification and frequency analyses.</td>
+</tr>
 </tbody>
 </table>
+<p>The cross-analysis fleetwide plot assumes you already have a matching
+<code>LifetimeDesignFrequencies</code> analysis persisted for the same assets.</p>
 <pre class="mermaid"><code>%%{init: {'theme': 'base', 'themeVariables': {
   'fontSize': 'small',
   'lineColor': '#4B5563',
@@ -2287,17 +2293,21 @@ graph TD
 graph TD
     A["Selected analysis id"] --&gt; B["Create time-series plot"]
     A --&gt; C["Create comparison plot"]
-    B --&gt; D["Time-series widget"]
-    C --&gt; E["Comparison widget"]
-    D --&gt; F["Display plots"]
-    E --&gt; F
+    A --&gt; D["Select matching frequency analysis id"]
+    B --&gt; E["Time-series widget"]
+    C --&gt; F["Comparison widget"]
+    D --&gt; G["Create cross-analysis fleetwide plot"]
+    G --&gt; H["Fleetwide widget"]
+    E --&gt; I["Display plots"]
+    F --&gt; I
+    H --&gt; I
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
 
-    class B,C api;
-    class D,E,F keep;
+    class B,C,G api;
+    class D,E,F,H,I keep;
     class A build;</code></pre>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">filters</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">:</span> <span class="n">analysis_id</span><span class="p">}</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
@@ -2313,9 +2323,21 @@ graph TD
 </span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;comparison&quot;</span><span class="p">,</span>
 </span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="p">)</span>
 </span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="c1"># Display in a notebook environment.</span>
-</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="n">display</span><span class="p">(</span><span class="n">time_series_plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
-</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="n">display</span><span class="p">(</span><span class="n">comparison_plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="n">verification_analysis_id</span> <span class="o">=</span> <span class="n">analysis_id</span>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="n">frequency_analysis_id</span> <span class="o">=</span> <span class="mi">46</span>  <span class="c1"># Existing LifetimeDesignFrequencies analysis for the same assets</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a><span class="n">cross_analysis_fleetwide_plot</span> <span class="o">=</span> <span class="n">results_service</span><span class="o">.</span><span class="n">plot_results</span><span class="p">(</span>
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;cross_analysis_fleetwide&quot;</span><span class="p">,</span>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>    <span class="n">source_filters</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>        <span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">:</span> <span class="n">frequency_analysis_id</span><span class="p">},</span>
+</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>        <span class="s2">&quot;verification&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">:</span> <span class="n">verification_analysis_id</span><span class="p">},</span>
+</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>    <span class="p">},</span>
+</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a><span class="p">)</span>
+</span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>
+</span><span id="__span-6-26"><a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="c1"># Display in a notebook environment.</span>
+</span><span id="__span-6-27"><a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a><span class="n">display</span><span class="p">(</span><span class="n">time_series_plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
+</span><span id="__span-6-28"><a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a><span class="n">display</span><span class="p">(</span><span class="n">comparison_plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
+</span><span id="__span-6-29"><a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a><span class="n">display</span><span class="p">(</span><span class="n">cross_analysis_fleetwide_plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
 </span></code></pre></div>
 <hr />
 <h2 id="what-you-learned">What You Learned<a class="headerlink" href="#what-you-learned" title="Permanent link">&para;</a></h2>
@@ -2326,7 +2348,8 @@ graph TD
 <li>How to conditionally create or reuse analyses and upload result rows
   with <code>create_or_update_results_bulk</code>.</li>
 <li>How to retrieve and reconstruct typed result series from persisted data.</li>
-<li>How to render time-series and comparison plots through <code>ResultsService</code>.</li>
+<li>How to render time-series, comparison, and cross-analysis fleetwide plots
+  through <code>ResultsService</code>.</li>
 </ul>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>

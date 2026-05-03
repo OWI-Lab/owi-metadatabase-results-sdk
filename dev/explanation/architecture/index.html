@@ -1870,6 +1870,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#registered-plot-definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registered Plot Definitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#adapter-pattern" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1978,14 +1989,17 @@ request flows from user code to the backend and back.</p>
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│   ├── wind_speed_histogram.py
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│   └── ceit.py        # CEIT sensor data handling
 </span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>├── plotting/          # Visualization layer
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│   ├── strategies.py  # PlotStrategyProtocol implementations
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│   ├── theme.py       # Chart styling
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│   ├── frequency.py   # Frequency-specific plotters
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│   ├── ceit.py        # CEIT-specific plotters
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│   └── response.py    # Response builders (notebook, HTML, JSON)
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>└── services/          # High-level service facade
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    ├── core.py        # ResultsService + ApiResultsRepository
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    └── ceit.py        # CeitResultsService
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│   ├── strategies.py  # Generic single-analysis plot strategies
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│   ├── definitions.py # Cross-analysis plot definition types
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│   ├── registry.py    # Registered cross-analysis plot definitions
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│   ├── theme.py       # Chart styling
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>│   ├── frequency.py   # Frequency-specific plotters
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>│   ├── frequency_verification.py # Cross-analysis fleetwide plot
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>│   ├── ceit.py        # CEIT-specific plotters
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>│   └── response.py    # Response builders (notebook, HTML, JSON)
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>└── services/          # High-level service facade
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    ├── core.py        # ResultsService + ApiResultsRepository
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    └── ceit.py        # CeitResultsService
 </span></code></pre></div>
 <h2 id="design-patterns">Design Patterns<a class="headerlink" href="#design-patterns" title="Permanent link">&para;</a></h2>
 <h3 id="registry-pattern">Registry Pattern<a class="headerlink" href="#registry-pattern" title="Permanent link">&para;</a></h3>
@@ -2004,9 +2018,19 @@ for dispatch:</p>
 <code>validate_inputs()</code> → <code>compute()</code> → <code>to_results()</code> → <code>from_results()</code> →
 <code>plot()</code>. Concrete analyses override specific steps.</p>
 <h3 id="strategy-pattern">Strategy Pattern<a class="headerlink" href="#strategy-pattern" title="Permanent link">&para;</a></h3>
-<p>Plot rendering is delegated to <code>PlotStrategyProtocol</code> implementations
-(e.g. <code>HistogramPlotStrategy</code>, <code>TimeSeriesPlotStrategy</code>). The analysis
-chooses a strategy by name, and <code>get_plot_strategy()</code> resolves it.</p>
+<p>Generic single-analysis rendering is delegated to
+<code>PlotStrategyProtocol</code> implementations (e.g. <code>HistogramPlotStrategy</code>,
+<code>TimeSeriesPlotStrategy</code>). The analysis chooses a strategy by name, and
+<code>get_plot_strategy()</code> resolves it. Analyses with plot-specific behavior
+can still bypass the generic strategies and call dedicated plotting
+modules directly.</p>
+<h3 id="registered-plot-definitions">Registered Plot Definitions<a class="headerlink" href="#registered-plot-definitions" title="Permanent link">&para;</a></h3>
+<p>Cross-analysis plots are registered separately from analyses through the
+plotting registry. A <code>PlotDefinition</code> declares the supported analysis
+names, the named source queries required by the plot, and the renderer
+used after those sources are fetched and normalized. <code>ResultsService</code>
+resolves these definitions by <code>plot_type</code> before it falls back to the
+ordinary single-analysis plotting path.</p>
 <h3 id="adapter-pattern">Adapter Pattern<a class="headerlink" href="#adapter-pattern" title="Permanent link">&para;</a></h3>
 <p><code>ApiResultsRepository</code> wraps <code>ResultsAPI</code> to satisfy
 <code>ResultsRepositoryProtocol</code>, decoupling the service layer from HTTP
@@ -2017,9 +2041,9 @@ registry, and serialization logic. Users call <code>get_results()</code> or
 <code>plot_results()</code> without managing the underlying components.</p>
 <h3 id="protocol-driven-contracts">Protocol-driven Contracts<a class="headerlink" href="#protocol-driven-contracts" title="Permanent link">&para;</a></h3>
 <p>The SDK defines runtime-checkable protocols (<code>ResultProtocol</code>,
-<code>PlotStrategyProtocol</code>, <code>AnalysisProtocol</code>, <code>ResultsRepositoryProtocol</code>,
-<code>QueryServiceProtocol</code>) to enforce structural typing without requiring
-inheritance.</p>
+<code>PlotStrategyProtocol</code>, <code>AnalysisProtocol</code>, <code>PlotDefinitionProtocol</code>,
+<code>ResultsRepositoryProtocol</code>, <code>QueryServiceProtocol</code>) to enforce
+structural typing without requiring inheritance.</p>
 <h2 id="request-lifecycle">Request Lifecycle<a class="headerlink" href="#request-lifecycle" title="Permanent link">&para;</a></h2>
 <pre class="mermaid"><code>sequenceDiagram
     participant User
@@ -2051,6 +2075,9 @@ inheritance.</p>
    result series.</li>
 <li><strong>User</strong> receives a clean pandas DataFrame.</li>
 </ol>
+<p>For cross-analysis plots, the service follows the same repository and
+deserialization flow, but fans out across multiple named sources before
+passing the normalized source frames to the registered plot definition.</p>
 <h2 id="return-value-conventions">Return Value Conventions<a class="headerlink" href="#return-value-conventions" title="Permanent link">&para;</a></h2>
 <p>All API methods return a dict with consistent keys:</p>
 <table>

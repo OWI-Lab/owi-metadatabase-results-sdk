@@ -1892,6 +1892,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#cross-analysis-fleetwide-plot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-analysis Fleetwide Plot
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#histogram-plot" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1988,14 +1999,28 @@
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="p">)</span>
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">display</span><span class="p">(</span><span class="n">plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
 </span></code></pre></div>
+<h3 id="cross-analysis-fleetwide-plot">Cross-analysis Fleetwide Plot<a class="headerlink" href="#cross-analysis-fleetwide-plot" title="Permanent link">&para;</a></h3>
+<p>Fleetwide overlay combining actual frequency reference lines with
+verification points across assets. Unlike the single-analysis plot types
+above, this plot is selected only by <code>plot_type</code>; the contributing
+analyses are passed through named <code>source_filters</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">plot</span> <span class="o">=</span> <span class="n">service</span><span class="o">.</span><span class="n">plot_results</span><span class="p">(</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;cross_analysis_fleetwide&quot;</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">source_filters</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>        <span class="s2">&quot;frequency&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">:</span> <span class="mi">46</span><span class="p">},</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="s2">&quot;verification&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="p">},</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">display</span><span class="p">(</span><span class="n">plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
+</span></code></pre></div>
 <h3 id="histogram-plot">Histogram Plot<a class="headerlink" href="#histogram-plot" title="Permanent link">&para;</a></h3>
 <p>Bar chart for binned data (e.g. <code>WindSpeedHistogram</code>):</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">plot</span> <span class="o">=</span> <span class="n">service</span><span class="o">.</span><span class="n">plot_results</span><span class="p">(</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="s2">&quot;WindSpeedHistogram&quot;</span><span class="p">,</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">filters</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">:</span> <span class="mi">55</span><span class="p">},</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;histogram&quot;</span><span class="p">,</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p">)</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="n">display</span><span class="p">(</span><span class="n">plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">plot</span> <span class="o">=</span> <span class="n">service</span><span class="o">.</span><span class="n">plot_results</span><span class="p">(</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="s2">&quot;WindSpeedHistogram&quot;</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="n">filters</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">:</span> <span class="mi">55</span><span class="p">},</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">plot_type</span><span class="o">=</span><span class="s2">&quot;histogram&quot;</span><span class="p">,</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="p">)</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">display</span><span class="p">(</span><span class="n">plot</span><span class="o">.</span><span class="n">notebook</span><span class="p">)</span>
 </span></code></pre></div>
 <h2 id="access-plot-outputs">Access Plot Outputs<a class="headerlink" href="#access-plot-outputs" title="Permanent link">&para;</a></h2>
 <p>Every <code>PlotResponse</code> provides multiple output formats:</p>
