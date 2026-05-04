@@ -27,6 +27,10 @@ class ApiResultsRepository:
         """Retrieve analysis rows from the backend."""
         return self.api.list_analyses(name=name, **kwargs)["data"]
 
+    def get_analysis(self, analysis_id: int) -> pd.DataFrame:
+        """Retrieve one analysis row from the backend."""
+        return self.api.get_analysis(id=analysis_id)["data"]
+
     def list_results(self, query: ResultQuery) -> pd.DataFrame:
         """Retrieve raw result rows from the backend."""
         return self.api.list_results(**query.to_backend_filters())["data"]
@@ -221,7 +225,48 @@ class ResultsService:
             query=source_query,
             records=source_records,
             frame=source_analysis.from_results(source_records),
+            analysis_frame=self._plot_source_analysis_frame(source_spec.analysis_name, source_query, source_records),
         )
+
+    def _plot_source_analysis_frame(
+        self,
+        analysis_name: str,
+        query: ResultQuery,
+        records: Sequence[ResultSeries],
+    ) -> pd.DataFrame:
+        """Fetch parent analysis metadata for normalized plot source rows."""
+        analysis_ids = sorted({record.analysis_id for record in records if record.analysis_id is not None})
+        if not analysis_ids and query.analysis_id is not None:
+            analysis_ids = [query.analysis_id]
+        if not analysis_ids:
+            return self._safe_plot_source_analysis_list(analysis_name)
+
+        get_analysis = getattr(self.repository, "get_analysis", None)
+        frames = []
+        if callable(get_analysis):
+            for analysis_id in analysis_ids:
+                try:
+                    frame = get_analysis(analysis_id)
+                except Exception:
+                    continue
+                if isinstance(frame, pd.DataFrame) and not frame.empty:
+                    frames.append(frame)
+        if not frames:
+            frames = [self._safe_plot_source_analysis_list(analysis_name)]
+        non_empty_frames = [frame for frame in frames if isinstance(frame, pd.DataFrame) and not frame.empty]
+        if not non_empty_frames:
+            return pd.DataFrame()
+        return pd.concat(non_empty_frames, ignore_index=True)
+
+    def _safe_plot_source_analysis_list(self, analysis_name: str) -> pd.DataFrame:
+        """Retrieve optional analysis metadata without failing plot rendering."""
+        try:
+            analysis_frame = self.repository.list_analyses(name=analysis_name)
+        except Exception:
+            return pd.DataFrame()
+        if not isinstance(analysis_frame, pd.DataFrame):
+            return pd.DataFrame()
+        return analysis_frame
 
     def _plot_defined_results(
         self,

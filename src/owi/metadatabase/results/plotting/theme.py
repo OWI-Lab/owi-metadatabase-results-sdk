@@ -55,11 +55,18 @@ def _xaxis_opts(*, name: str, rotate: int = 0, boundary_gap: bool | None = None)
     return opts.AxisOpts(**kwargs)
 
 
-def _yaxis_opts(*, name: str) -> opts.AxisOpts:
+def _yaxis_opts(
+    *,
+    name: str,
+    min_: int | float | str | None = None,
+    max_: int | float | str | None = None,
+) -> opts.AxisOpts:
     """Return cartesian y-axis options with monospace text."""
     return opts.AxisOpts(
         name=name,
         is_scale=True,
+        min_=min_,
+        max_=max_,
         axislabel_opts=_label_opts(),
         name_textstyle_opts=_text_style_opts(),
     )

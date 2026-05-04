@@ -114,7 +114,11 @@ class DjangoResultSerializer:
                 )
             )
         data_additional = _optional_mapping(mapping.get("additional_data") or mapping.get("data_additional"))
+        analysis_id = _optional_int(mapping.get("analysis"))
+        if analysis_id is None:
+            analysis_id = _optional_int(mapping.get("analysis_id"))
         return ResultSeries(
+            analysis_id=analysis_id,
             analysis_name=str(data_additional.get("analysis_name", mapping.get("analysis_name", "unknown"))),
             analysis_kind=AnalysisKind(data_additional.get("analysis_kind", "comparison")),
             result_scope=ResultScope(data_additional.get("result_scope", "site")),

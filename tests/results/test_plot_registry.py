@@ -123,11 +123,22 @@ def test_assemble_frequency_verification_comparison_frame_from_named_sources() -
                 frame=pd.DataFrame(
                     [
                         {
+                            "analysis_id": 19,
                             "x": datetime(2024, 1, 1, tzinfo=timezone.utc).isoformat(),
                             "y": 2.5517,
                             "series_name": "WFA03 - FA1",
                             "turbine": "WFA03",
                             "metric": "FA1",
+                            "result_additional_data": {"permissable_frequency": [2.8, 1.7]},
+                        }
+                    ]
+                ),
+                analysis_frame=pd.DataFrame(
+                    [
+                        {
+                            "id": 19,
+                            "additional_data": {"permissable_frequency": [3.0, 1.5]},
+                            "source_url": "https://example.test/verification-source",
                         }
                     ]
                 ),
@@ -144,6 +155,11 @@ def test_assemble_frequency_verification_comparison_frame_from_named_sources() -
         "hover_name",
         "reference_label",
         "reference_order",
+        "source_url",
+        "result_permissable_frequency_lower",
+        "result_permissable_frequency_upper",
+        "analysis_permissable_frequency_lower",
+        "analysis_permissable_frequency_upper",
     ]
 
     frequency_rows = frame[frame["reference_label"].notna()].reset_index(drop=True)
@@ -158,3 +174,8 @@ def test_assemble_frequency_verification_comparison_frame_from_named_sources() -
     assert verification_rows.loc[0, "hover_name"] == "WFA03"
     assert verification_rows.loc[0, "metric"] == "FA1"
     assert verification_rows.loc[0, "timestamp_label"].startswith("2024-01-01T00:00:00")
+    assert verification_rows.loc[0, "source_url"] == "https://example.test/verification-source"
+    assert verification_rows.loc[0, "result_permissable_frequency_lower"] == 1.7
+    assert verification_rows.loc[0, "result_permissable_frequency_upper"] == 2.8
+    assert verification_rows.loc[0, "analysis_permissable_frequency_lower"] == 1.5
+    assert verification_rows.loc[0, "analysis_permissable_frequency_upper"] == 3.0

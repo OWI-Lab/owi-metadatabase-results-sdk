@@ -63,10 +63,25 @@ class StubLocationRepository(StubRepository):
 class MultiAnalysisRepository(StubRepository):
     """Repository stub that returns different result frames per analysis name."""
 
-    def __init__(self, frames_by_analysis: dict[str, pd.DataFrame]) -> None:
+    def __init__(
+        self,
+        frames_by_analysis: dict[str, pd.DataFrame],
+        analysis_frames_by_id: dict[int, pd.DataFrame] | None = None,
+    ) -> None:
         super().__init__(pd.DataFrame())
         self.frames_by_analysis = frames_by_analysis
+        self.analysis_frames_by_id = analysis_frames_by_id or {}
         self.queries: list[Any] = []
+        self.analysis_queries: list[int] = []
+
+    def list_analyses(self, name: str | None = None, **kwargs: Any) -> pd.DataFrame:
+        if "id" in kwargs:
+            raise AssertionError("Analysis metadata by id should use get_analysis, not list_analyses.")
+        return pd.DataFrame()
+
+    def get_analysis(self, analysis_id: int) -> pd.DataFrame:
+        self.analysis_queries.append(analysis_id)
+        return self.analysis_frames_by_id.get(int(analysis_id), pd.DataFrame())
 
     def list_results(self, query: Any) -> pd.DataFrame:
         self.queries.append(query)
@@ -546,7 +561,7 @@ def test_results_service_plot_results_supports_cross_analysis_fleetwide_without_
     assert [query.location_id for query in repository.queries] == [9, 9]
 
 
-def test_results_service_plot_results_supports_cross_analysis_asset_without_analysis_name() -> None:
+def test_results_service_cross_analysis_uses_parent_analysis_metadata_for_verification_plot() -> None:
     frequency_analysis = LifetimeDesignFrequencies()
     verification_analysis = LifetimeDesignVerification()
     repository = MultiAnalysisRepository(
@@ -575,22 +590,102 @@ def test_results_service_plot_results_supports_cross_analysis_asset_without_anal
                         {
                             "rows": [
                                 {
-                                    "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
-                                    "turbine": "WFA03",
-                                    "FA1": 2.6631,
-                                    "location_id": 9,
-                                },
-                                {
                                     "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
                                     "turbine": "WFA03",
                                     "FA1": 2.5517,
                                     "location_id": 9,
-                                },
+                                }
                             ]
                         }
                     )
                 ]
             ),
+        },
+        analysis_frames_by_id={
+            19: pd.DataFrame(
+                [
+                    {
+                        "id": 19,
+                        "source_url": "https://example.test/analysis-source",
+                        "additional_data": {"permissable_frequency": [2.9, 1.4]},
+                    }
+                ]
+            )
+        },
+    )
+    service = ResultsService(repository=repository)
+
+    response = service.plot_results(
+        filters={"location_id": 9},
+        plot_type="cross_analysis_fleetwide",
+        source_filters={
+            "frequency": {"analysis_id": 17},
+            "verification": {"analysis_id": 19},
+        },
+    )
+    options = json.loads(response.json_options)
+
+    verification_series = next(series for series in options["FA1"]["series"] if series["name"] == "Verification")
+    reference_series = next(series for series in options["FA1"]["series"] if series["name"] == "INFL")
+    limit_series = next(
+        series for series in options["FA1"]["series"] if series["name"] == "_Permissable Frequency Limits"
+    )
+
+    assert verification_series["data"][0]["value"][4] == "https://example.test/analysis-source"
+    assert "Source:" in verification_series["tooltip"]["formatter"]
+    assert reference_series["markArea"]["data"] == [[{"yAxis": 1.4}, {"yAxis": 2.9}]]
+    assert [point["value"][1] for point in limit_series["data"]] == [1.4, 2.9]
+    assert repository.analysis_queries == [17, 19]
+
+
+def test_results_service_plot_results_supports_cross_analysis_asset_without_analysis_name() -> None:
+    frequency_analysis = LifetimeDesignFrequencies()
+    verification_analysis = LifetimeDesignVerification()
+    verification_payloads = [
+        series.to_record_payload(analysis_id=19)
+        for series in verification_analysis.to_results(
+            {
+                "rows": [
+                    {
+                        "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
+                        "turbine": "WFA03",
+                        "FA1": 2.6631,
+                        "location_id": 9,
+                    },
+                    {
+                        "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                        "turbine": "WFA03",
+                        "FA1": 2.5517,
+                        "location_id": 9,
+                    },
+                ]
+            }
+        )
+    ]
+    for payload in verification_payloads:
+        if payload["name_col2"] == "fa1":
+            payload["additional_data"]["permissable_frequency"] = [0.295, 0.4]
+
+    repository = MultiAnalysisRepository(
+        {
+            "LifetimeDesignFrequencies": pd.DataFrame(
+                [
+                    series.to_record_payload(analysis_id=17)
+                    for series in frequency_analysis.to_results(
+                        {
+                            "rows": [
+                                {
+                                    "turbine": "WFA03",
+                                    "reference": "INFL",
+                                    "FA1": 2.4123,
+                                    "location_id": 9,
+                                }
+                            ]
+                        }
+                    )
+                ]
+            ),
+            "LifetimeDesignVerification": pd.DataFrame(verification_payloads),
         }
     )
     service = ResultsService(repository=repository)
@@ -609,6 +704,15 @@ def test_results_service_plot_results_supports_cross_analysis_asset_without_anal
         "2024-01-01T00:00:00+00:00",
         "2024-01-02T00:00:00+00:00",
     ]
+    reference_series = next(series for series in options["FA1"]["series"] if series["name"] == "INFL")
+    limit_series = next(
+        series for series in options["FA1"]["series"] if series["name"] == "_Permissable Frequency Limits"
+    )
+
+    assert reference_series["markArea"]["data"] == [[{"yAxis": 0.295}, {"yAxis": 0.4}]]
+    assert [point["value"][1] for point in limit_series["data"]] == [0.295, 0.4, 0.295, 0.4]
+    assert "min" not in options["FA1"]["yAxis"][0]
+    assert "max" not in options["FA1"]["yAxis"][0]
     assert [query.analysis_name for query in repository.queries] == [
         "LifetimeDesignFrequencies",
         "LifetimeDesignVerification",
