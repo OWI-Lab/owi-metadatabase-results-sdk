@@ -150,6 +150,7 @@ class TestLifetimeDesignVerification:
         df = analysis.from_results(results)
         assert len(df) == 2
         assert set(df["turbine"]) == {"A01"}
+        assert set(df["location_id"]) == {5}
         assert all(df["x"].str.startswith("2024-01-0"))
 
     def test_to_results_site_scope_when_no_location(self) -> None:

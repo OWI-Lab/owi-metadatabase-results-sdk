@@ -91,7 +91,7 @@ flowchart TD
 
   BaseAnalysis --> GenericPlots[plotting/strategies.py\nGeneric single-analysis strategies]
   Freq --> FreqPlots[plotting/frequency.py\nComparison / location / geo plots]
-  Verify --> VerifyPlots[plotting/verification.py\nTime-series metric charts]
+  Verify --> VerifyPlots[plotting/verification.py\nTime-series + water-depth trend charts]
   PlotRegistry --> FreqVerifyPlots[plotting/frequency_verification.py\nCross-analysis fleetwide plot]
   CEIT --> CeitPlots[plotting/ceit.py\nSensor dropdown charts]
 

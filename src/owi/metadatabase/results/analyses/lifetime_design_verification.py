@@ -10,7 +10,11 @@ import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..models import AnalysisKind, PlotRequest, PlotResponse, ResultScope, ResultSeries, ResultVector
-from ..plotting.verification import plot_verification_comparison, plot_verification_time_series
+from ..plotting.verification import (
+    plot_verification_comparison,
+    plot_verification_time_series,
+    plot_verification_water_depth_trend,
+)
 from ..registry import register_analysis
 from .base import BaseAnalysis
 
@@ -135,6 +139,7 @@ class LifetimeDesignVerification(BaseAnalysis):
                         "series_name": result.short_description,
                         "turbine": turbine,
                         "metric": metric,
+                        "location_id": result.location_id,
                         "result_additional_data": result.data_additional,
                     }
                 )
@@ -156,4 +161,12 @@ class LifetimeDesignVerification(BaseAnalysis):
             return plot_verification_time_series(data)
         if plot_type == "comparison":
             return plot_verification_comparison(data)
+        if plot_type == "water_depth_trend":
+            location_frame = plot_request.context.get("location_frame")
+            analysis_frame = plot_request.context.get("analysis_frame")
+            return plot_verification_water_depth_trend(
+                data,
+                location_frame=location_frame if isinstance(location_frame, pd.DataFrame) else None,
+                analysis_frame=analysis_frame if isinstance(analysis_frame, pd.DataFrame) else None,
+            )
         raise ValueError(f"Unsupported plot_type for {self.analysis_name}: {plot_type}")

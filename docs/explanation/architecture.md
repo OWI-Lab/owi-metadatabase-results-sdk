@@ -27,6 +27,7 @@ owi.metadatabase.results
 │   ├── registry.py    # Registered cross-analysis plot definitions
 │   ├── theme.py       # Chart styling
 │   ├── frequency.py   # Frequency-specific plotters
+│   ├── verification.py # Verification time-series and water-depth trend plotters
 │   ├── frequency_verification.py # Cross-analysis fleetwide plot
 │   ├── ceit.py        # CEIT-specific plotters
 │   └── response.py    # Response builders (notebook, HTML, JSON)

@@ -350,16 +350,20 @@ print(retrieved_frame.head())
 
 ## Step 7 — Plot the Results
 
-The `ResultsService` provides three plot types relevant to this workflow:
+The `ResultsService` provides four plot types relevant to this workflow:
 
 | Plot type | Visualization |
 |-----------|---------------|
 | `time_series` | Verification metrics evolving across timestamps. |
 | `comparison` | Metric values compared across turbines or grouped series. |
+| `water_depth_trend` | Verification frequency against absolute asset-location `elevation` water depth, with one dropdown entry per metric. |
 | `cross_analysis_fleetwide` | Fleetwide overlay combining persisted verification and frequency analyses. |
 
 The cross-analysis fleetwide plot assumes you already have a matching
 `LifetimeDesignFrequencies` analysis persisted for the same assets.
+The water-depth trend plot uses the absolute value of asset-location
+`elevation` as its x-coordinate and skips turbines where that value is
+missing.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -371,21 +375,24 @@ The cross-analysis fleetwide plot assumes you already have a matching
 graph TD
     A["Selected analysis id"] --> B["Create time-series plot"]
     A --> C["Create comparison plot"]
-    A --> D["Select matching frequency analysis id"]
-    B --> E["Time-series widget"]
-    C --> F["Comparison widget"]
-    D --> G["Create cross-analysis fleetwide plot"]
-    G --> H["Fleetwide widget"]
-    E --> I["Display plots"]
-    F --> I
-    H --> I
+    A --> D["Create water-depth trend plot"]
+    A --> E["Select matching frequency analysis id"]
+    B --> F["Time-series widget"]
+    C --> G["Comparison widget"]
+    D --> H["Water-depth trend widget"]
+    E --> I["Create cross-analysis fleetwide plot"]
+    I --> J["Fleetwide widget"]
+    F --> K["Display plots"]
+    G --> K
+    H --> K
+    J --> K
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
 
-    class B,C,G api;
-    class D,E,F,H,I keep;
+    class B,C,D,I api;
+    class E,F,G,H,J,K keep;
     class A build;
 ```
 
@@ -404,6 +411,12 @@ comparison_plot = results_service.plot_results(
     plot_type="comparison",
 )
 
+water_depth_trend_plot = results_service.plot_results(
+    analysis.analysis_name,
+    filters=filters,
+    plot_type="water_depth_trend",
+)
+
 verification_analysis_id = analysis_id
 frequency_analysis_id = 46  # Existing LifetimeDesignFrequencies analysis for the same assets
 
@@ -418,6 +431,7 @@ cross_analysis_fleetwide_plot = results_service.plot_results(
 # Display in a notebook environment.
 display(time_series_plot.notebook)
 display(comparison_plot.notebook)
+display(water_depth_trend_plot.notebook)
 display(cross_analysis_fleetwide_plot.notebook)
 ```
 
@@ -431,7 +445,7 @@ display(cross_analysis_fleetwide_plot.notebook)
 - How to conditionally create or reuse analyses and upload result rows
   with `create_or_update_results_bulk`.
 - How to retrieve and reconstruct typed result series from persisted data.
-- How to render time-series, comparison, and cross-analysis fleetwide plots
+- How to render time-series, comparison, water-depth trend, and cross-analysis fleetwide plots
   through `ResultsService`.
 
 ## Next Steps

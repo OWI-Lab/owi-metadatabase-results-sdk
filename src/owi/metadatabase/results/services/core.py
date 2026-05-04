@@ -58,13 +58,15 @@ class ApiResultsRepository:
     def get_location_frame(self, location_ids: Sequence[int]) -> pd.DataFrame:
         """Retrieve location metadata required by map-oriented plots."""
         if not location_ids:
-            return pd.DataFrame(columns=["id", "title", "northing", "easting"])
+            return pd.DataFrame(columns=["id", "title", "northing", "easting", "elevation"])
         location_api = LocationsAPI(api_root=self.api.base_api_root, **self.api._auth_kwargs())
         assetlocations = location_api.get_assetlocations()["data"]
         if assetlocations.empty or "id" not in assetlocations.columns:
-            return pd.DataFrame(columns=["id", "title", "northing", "easting"])
+            return pd.DataFrame(columns=["id", "title", "northing", "easting", "elevation"])
         location_frame = assetlocations[assetlocations["id"].isin(location_ids)].copy()
-        columns = [column for column in ["id", "title", "northing", "easting"] if column in location_frame.columns]
+        columns = [
+            column for column in ["id", "title", "northing", "easting", "elevation"] if column in location_frame.columns
+        ]
         return location_frame.loc[:, columns]
 
 
@@ -172,7 +174,7 @@ class ResultsService:
 
     def get_location_frame(self, location_ids: Sequence[int]) -> pd.DataFrame:
         """Return location metadata for the given backend location identifiers."""
-        columns = ["id", "title", "northing", "easting"]
+        columns = ["id", "title", "northing", "easting", "elevation"]
         if not location_ids:
             return pd.DataFrame(columns=columns)
         get_location_frame = getattr(self.repository, "get_location_frame", None)
@@ -198,15 +200,22 @@ class ResultsService:
         records: Sequence[ResultSeries],
         *,
         plot_type: str | None,
+        analysis_name: str | None = None,
+        query: ResultQuery | None = None,
     ) -> dict[str, Any]:
         """Build optional context required by specific plot types."""
         context: dict[str, Any] = {}
-        if plot_type not in {"geo", "map"}:
+        if plot_type not in {"geo", "map", "water_depth_trend"}:
             return context
         location_ids = sorted({record.location_id for record in records if record.location_id is not None})
         location_frame = self.get_location_frame(location_ids)
         if not location_frame.empty:
             context["location_frame"] = location_frame
+        if plot_type == "water_depth_trend" and analysis_name is not None:
+            analysis_query = query or ResultQuery(analysis_name=analysis_name)
+            analysis_frame = self._plot_source_analysis_frame(analysis_name, analysis_query, records)
+            if not analysis_frame.empty:
+                context["analysis_frame"] = analysis_frame
         return context
 
     def _plot_source_data(
@@ -386,7 +395,12 @@ class ResultsService:
             analysis_name=requested_analysis_name,
             filters=query.model_dump(),
             plot_type=plot_type,
-            context=self._plot_context(records, plot_type=plot_type),
+            context=self._plot_context(
+                records,
+                plot_type=plot_type,
+                analysis_name=requested_analysis_name,
+                query=query,
+            ),
         )
         return analysis.plot(records, request=plot_request)
 
