@@ -10,6 +10,7 @@ import pytest
 from owi.metadatabase.results.models import ResultQuery
 from owi.metadatabase.results.plotting.definitions import PlotSourceData
 from owi.metadatabase.results.plotting.frequency_verification import (
+    assemble_delta_design_frequency_histogram_frame,
     assemble_frequency_verification_comparison_frame,
 )
 from owi.metadatabase.results.plotting.registry import get_plot_definition
@@ -23,6 +24,12 @@ def test_get_plot_definition_supports_cross_analysis_plot_without_owner() -> Non
 
 def test_get_plot_definition_supports_cross_analysis_asset_plot_without_owner() -> None:
     definition = get_plot_definition("cross_analysis_asset")
+
+    assert definition is not None
+
+
+def test_get_plot_definition_supports_delta_histogram_plot_without_owner() -> None:
+    definition = get_plot_definition("cross_analysis_fleetwide_delta_histogram")
 
     assert definition is not None
 
@@ -49,6 +56,21 @@ def test_get_plot_definition_supports_asset_plot_compatible_analysis_names() -> 
     )
     frequency_definition = get_plot_definition(
         "cross_analysis_asset",
+        analysis_name="LifetimeDesignFrequencies",
+    )
+
+    assert verification_definition is not None
+    assert frequency_definition is not None
+    assert verification_definition is frequency_definition
+
+
+def test_get_plot_definition_supports_delta_histogram_compatible_analysis_names() -> None:
+    verification_definition = get_plot_definition(
+        "cross_analysis_fleetwide_delta_histogram",
+        analysis_name="LifetimeDesignVerification",
+    )
+    frequency_definition = get_plot_definition(
+        "cross_analysis_fleetwide_delta_histogram",
         analysis_name="LifetimeDesignFrequencies",
     )
 
@@ -179,3 +201,74 @@ def test_assemble_frequency_verification_comparison_frame_from_named_sources() -
     assert verification_rows.loc[0, "result_permissable_frequency_upper"] == 2.8
     assert verification_rows.loc[0, "analysis_permissable_frequency_lower"] == 1.5
     assert verification_rows.loc[0, "analysis_permissable_frequency_upper"] == 3.0
+
+
+def test_assemble_delta_design_frequency_histogram_frame_uses_latest_verification() -> None:
+    frame = assemble_delta_design_frequency_histogram_frame(
+        {
+            "frequency": PlotSourceData(
+                key="frequency",
+                analysis_name="LifetimeDesignFrequencies",
+                query=ResultQuery(analysis_name="LifetimeDesignFrequencies"),
+                records=[],
+                frame=pd.DataFrame(
+                    [
+                        {
+                            "x": "INFL",
+                            "y": 100.0,
+                            "series_name": "WFA03 - FA1",
+                            "turbine": "WFA03",
+                            "metric": "FA1",
+                            "reference": "INFL",
+                        },
+                        {
+                            "x": "ACTU",
+                            "y": 80.0,
+                            "series_name": "WFA03 - FA1",
+                            "turbine": "WFA03",
+                            "metric": "FA1",
+                            "reference": "ACTU",
+                        },
+                        {
+                            "x": "ZERO",
+                            "y": 0.0,
+                            "series_name": "WFA03 - FA1",
+                            "turbine": "WFA03",
+                            "metric": "FA1",
+                            "reference": "ZERO",
+                        },
+                    ]
+                ),
+            ),
+            "verification": PlotSourceData(
+                key="verification",
+                analysis_name="LifetimeDesignVerification",
+                query=ResultQuery(analysis_name="LifetimeDesignVerification"),
+                records=[],
+                frame=pd.DataFrame(
+                    [
+                        {
+                            "analysis_id": 19,
+                            "x": datetime(2024, 1, 1, tzinfo=timezone.utc).isoformat(),
+                            "y": 90.0,
+                            "series_name": "WFA03 - FA1",
+                            "turbine": "WFA03",
+                            "metric": "FA1",
+                        },
+                        {
+                            "analysis_id": 19,
+                            "x": datetime(2024, 1, 2, tzinfo=timezone.utc).isoformat(),
+                            "y": 110.0,
+                            "series_name": "WFA03 - FA1",
+                            "turbine": "WFA03",
+                            "metric": "FA1",
+                        },
+                    ]
+                ),
+            ),
+        }
+    )
+
+    assert list(frame["reference_label"]) == ["INFL", "ACTU"]
+    assert list(frame["verification_frequency"]) == [110.0, 110.0]
+    assert list(frame["delta_design_frequency_percent"]) == pytest.approx([10.0, 37.5])

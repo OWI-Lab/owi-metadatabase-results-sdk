@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from math import ceil, sqrt
 from typing import Any, cast
 
 import pandas as pd
@@ -37,6 +38,16 @@ _PERMISSABLE_BAND_STACK = "__permissable_frequency_band"
 _VERIFICATION_MIN_OPACITY = 0.3
 _REFERENCE_SYMBOL_SIZE = 5
 _VERIFICATION_SYMBOL_SIZE = 8
+_DELTA_HISTOGRAM_MAX_BINS = 12
+_DELTA_HISTOGRAM_COLORS = ("#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#8c564b", "#17becf")
+_DELTA_HISTOGRAM_DECALS = (
+    {"symbol": "rect", "dashArrayX": [1, 0], "dashArrayY": [1, 0]},
+    {"symbol": "rect", "dashArrayX": [1, 0], "dashArrayY": [4, 2], "rotation": 0.7853981634},
+    {"symbol": "rect", "dashArrayX": [1, 0], "dashArrayY": [3, 3]},
+    {"symbol": "rect", "dashArrayX": [2, 4], "dashArrayY": [1, 0]},
+    {"symbol": "circle", "symbolSize": 1, "dashArrayX": [4, 4], "dashArrayY": [4, 4]},
+    {"symbol": "rect", "dashArrayX": [2, 2], "dashArrayY": [2, 2], "rotation": -0.7853981634},
+)
 _REQUIRED_COLUMNS = {"asset", "metric", "y"}
 _NORMALIZED_COLUMNS = [
     "asset",
@@ -54,6 +65,17 @@ _NORMALIZED_COLUMNS = [
     "analysis_permissable_frequency_upper",
 ]
 _COMBINED_FREQUENCY_VERIFICATION_COLUMNS = list(_NORMALIZED_COLUMNS)
+_DELTA_HISTOGRAM_COLUMNS = [
+    "asset",
+    "metric",
+    "reference_label",
+    "reference_order",
+    "design_frequency",
+    "verification_frequency",
+    "timestamp_label",
+    "timestamp_epoch",
+    "delta_design_frequency_percent",
+]
 
 
 def _require_columns(frame: pd.DataFrame, required_columns: set[str], *, frame_name: str) -> None:
@@ -162,9 +184,7 @@ def _build_plot_source_query(
 ) -> ResultQuery:
     """Clone the base query for one source analysis."""
     backend_filters = {
-        key: value
-        for key, value in query.backend_filters.items()
-        if key not in {"analysis__id", "analysis__name"}
+        key: value for key, value in query.backend_filters.items() if key not in {"analysis__id", "analysis__name"}
     }
     return query.model_copy(
         update={
@@ -256,9 +276,7 @@ def assemble_frequency_verification_comparison_frame(sources_by_key: Mapping[str
                 result_additional_data = _coerce_mapping(record.get("data_additional"))
             analysis_id = _coerce_optional_int(record.get("analysis_id"))
             analysis_metadata = (
-                analysis_metadata_by_id.get(analysis_id)
-                if analysis_id is not None
-                else single_analysis_metadata
+                analysis_metadata_by_id.get(analysis_id) if analysis_id is not None else single_analysis_metadata
             )
             if analysis_metadata is None:
                 analysis_metadata = single_analysis_metadata or {}
@@ -312,12 +330,55 @@ def _render_frequency_verification_asset_plot(
     if empty_sources:
         missing = ", ".join(empty_sources)
         raise ValueError(
-            "No frequency verification data is available to plot after filtering. "
-            f"Empty sources: {missing}."
+            f"No frequency verification data is available to plot after filtering. Empty sources: {missing}."
         )
-    return plot_frequency_verification_asset_history(
-        assemble_frequency_verification_comparison_frame(sources_by_key)
+    return plot_frequency_verification_asset_history(assemble_frequency_verification_comparison_frame(sources_by_key))
+
+
+def assemble_delta_design_frequency_histogram_frame(sources_by_key: Mapping[str, PlotSourceData]) -> pd.DataFrame:
+    """Compute latest-verification deltas from frequency and verification sources."""
+    frame = assemble_frequency_verification_comparison_frame(sources_by_key)
+    if frame.empty:
+        return pd.DataFrame(columns=_DELTA_HISTOGRAM_COLUMNS)
+
+    frequency_frame = frame.dropna(subset=["reference_label"]).copy()
+    verification_frame = frame.dropna(subset=["timestamp_epoch"]).copy()
+    if frequency_frame.empty or verification_frame.empty:
+        return pd.DataFrame(columns=_DELTA_HISTOGRAM_COLUMNS)
+
+    design_frame = frequency_frame.loc[
+        :,
+        ["asset", "metric", "y", "reference_label", "reference_order"],
+    ].rename(columns={"y": "design_frequency"})
+    latest_index = verification_frame.groupby(["asset", "metric"], sort=False)["timestamp_epoch"].idxmax()
+    latest_verification = verification_frame.loc[
+        latest_index,
+        ["asset", "metric", "y", "timestamp_label", "timestamp_epoch"],
+    ].rename(columns={"y": "verification_frequency"})
+    delta_frame = design_frame.merge(latest_verification, how="inner", on=["asset", "metric"])
+    delta_frame["design_frequency"] = pd.to_numeric(delta_frame["design_frequency"], errors="coerce")
+    delta_frame["verification_frequency"] = pd.to_numeric(delta_frame["verification_frequency"], errors="coerce")
+    delta_frame = delta_frame.dropna(subset=["design_frequency", "verification_frequency"])
+    delta_frame = delta_frame[delta_frame["design_frequency"] != 0].copy()
+    if delta_frame.empty:
+        return pd.DataFrame(columns=_DELTA_HISTOGRAM_COLUMNS)
+
+    delta_frame["delta_design_frequency_percent"] = (
+        (delta_frame["verification_frequency"] - delta_frame["design_frequency"])
+        / delta_frame["design_frequency"]
+        * 100.0
     )
+    delta_frame["reference_order"] = pd.to_numeric(delta_frame["reference_order"], errors="coerce")
+    return delta_frame.loc[:, _DELTA_HISTOGRAM_COLUMNS].reset_index(drop=True)
+
+
+def _render_delta_design_frequency_histogram_plot(
+    sources_by_key: Mapping[str, PlotSourceData],
+    request: Any,
+) -> Any:
+    """Render the fleetwide delta design frequency histogram."""
+    del request
+    return plot_delta_design_frequency_histogram(assemble_delta_design_frequency_histogram_frame(sources_by_key))
 
 
 def build_frequency_verification_plot_definition() -> PlotDefinition:
@@ -343,6 +404,19 @@ def build_frequency_verification_asset_plot_definition() -> PlotDefinition:
         plot_type="cross_analysis_asset",
         build_sources=_build_frequency_verification_sources,
         render=_render_frequency_verification_asset_plot,
+    )
+
+
+def build_delta_design_frequency_histogram_plot_definition() -> PlotDefinition:
+    """Return the registered cross-analysis fleetwide delta histogram definition."""
+    return PlotDefinition(
+        supported_analysis_names=(
+            LIFETIME_DESIGN_FREQUENCIES_ANALYSIS_NAME,
+            LIFETIME_DESIGN_VERIFICATION_ANALYSIS_NAME,
+        ),
+        plot_type="cross_analysis_fleetwide_delta_histogram",
+        build_sources=_build_frequency_verification_sources,
+        render=_render_delta_design_frequency_histogram_plot,
     )
 
 
@@ -637,6 +711,132 @@ def _set_legend_only_layout(chart: Line) -> None:
         grid["top"] = "22%"
 
 
+def _delta_histogram_bin_edges(values: list[float]) -> list[float]:
+    """Return shared histogram bin edges for one metric."""
+    if not values:
+        return [0.0, 1.0]
+
+    lower = min(values)
+    upper = max(values)
+    if lower == upper:
+        padding = max(abs(lower) * 0.1, 1.0)
+        return [lower - padding, upper + padding]
+
+    bin_count = min(_DELTA_HISTOGRAM_MAX_BINS, max(4, ceil(sqrt(len(values)))))
+    width = (upper - lower) / bin_count
+    return [lower + width * index for index in range(bin_count)] + [upper]
+
+
+def _delta_histogram_bin_labels(edges: list[float]) -> list[str]:
+    """Return readable labels for percentage histogram bins."""
+    labels: list[str] = []
+    for index in range(len(edges) - 1):
+        left = edges[index]
+        right = edges[index + 1]
+        bracket = "]" if index == len(edges) - 2 else ")"
+        labels.append(f"[{left:.1f}, {right:.1f}{bracket}")
+    return labels
+
+
+def _delta_histogram_bin_index(value: float, edges: list[float]) -> int | None:
+    """Return the bin index for a value using shared histogram edges."""
+    if len(edges) < 2:
+        return None
+    if value == edges[-1]:
+        return len(edges) - 2
+    for index in range(len(edges) - 1):
+        if edges[index] <= value < edges[index + 1]:
+            return index
+    return None
+
+
+def _delta_histogram_counts(values: list[float], edges: list[float]) -> list[int]:
+    """Count percentage delta values per histogram bin."""
+    counts = [0 for _ in range(max(len(edges) - 1, 0))]
+    for value in values:
+        bin_index = _delta_histogram_bin_index(value, edges)
+        if bin_index is not None:
+            counts[bin_index] += 1
+    return counts
+
+
+def _delta_histogram_tooltip() -> JsCode:
+    """Return tooltip JS for delta histogram bars."""
+    return JsCode(
+        "function (params) {"
+        "  return '<strong>' + params.seriesName + '</strong>'"
+        "    + '<br/>Δ design frequency: ' + params.name"
+        "    + '<br/># samples: ' + params.value;"
+        "}"
+    )
+
+
+def _delta_histogram_itemstyle(index: int) -> dict[str, Any]:
+    """Return color and decal style for one reference-label series."""
+    return {
+        "color": _DELTA_HISTOGRAM_COLORS[index % len(_DELTA_HISTOGRAM_COLORS)],
+        "decal": _DELTA_HISTOGRAM_DECALS[index % len(_DELTA_HISTOGRAM_DECALS)],
+    }
+
+
+def plot_delta_design_frequency_histogram(data: pd.DataFrame) -> Any:
+    """Plot fleetwide delta design frequency histograms per metric."""
+    if data.empty:
+        raise ValueError("No delta design frequency data is available to plot.")
+
+    frame = data.copy()
+    frame["metric"] = frame["metric"].astype(str).str.upper()
+    frame["reference_label"] = frame["reference_label"].astype(str)
+    frame["reference_order"] = pd.to_numeric(frame["reference_order"], errors="coerce")
+    frame["delta_design_frequency_percent"] = pd.to_numeric(frame["delta_design_frequency_percent"], errors="coerce")
+    frame = frame.dropna(subset=["delta_design_frequency_percent"])
+    if frame.empty:
+        raise ValueError("No delta design frequency data is available to plot.")
+
+    charts: dict[str, Bar] = {}
+    tooltip = _delta_histogram_tooltip()
+    for metric, metric_frame in frame.groupby("metric", sort=True):
+        values = metric_frame["delta_design_frequency_percent"].astype(float).tolist()
+        edges = _delta_histogram_bin_edges(values)
+        x_values = _delta_histogram_bin_labels(edges)
+        chart = Bar(init_opts=opts.InitOpts(width="100%", height="420px"))
+        chart.add_xaxis(x_values)
+        reference_order = (
+            metric_frame.groupby("reference_label")["reference_order"].min().sort_values(kind="stable").index.tolist()
+        )
+        for index, reference_label in enumerate(reference_order):
+            reference_values = (
+                metric_frame.loc[
+                    metric_frame["reference_label"] == reference_label,
+                    "delta_design_frequency_percent",
+                ]
+                .astype(float)
+                .tolist()
+            )
+            chart.add_yaxis(
+                str(reference_label),
+                cast(Any, _delta_histogram_counts(reference_values, edges)),
+                category_gap="35%",
+                gap="10%",
+                label_opts=_label_opts(is_show=False),
+                itemstyle_opts=_delta_histogram_itemstyle(index),
+                tooltip_opts=opts.TooltipOpts(trigger="item", formatter=tooltip),
+            )
+        chart.options["aria"] = {"enabled": True, "decal": {"show": True}}
+        chart.set_global_opts(
+            title_opts=opts.TitleOpts(is_show=False),
+            legend_opts=_legend_opts(),
+            tooltip_opts=_tooltip_opts(trigger="item"),
+            xaxis_opts=_xaxis_opts(name="Δ design frequency [%]"),
+            yaxis_opts=_yaxis_opts(name="# samples"),
+        )
+        _apply_cartesian_layout(chart)
+        _set_legend_only_layout(chart)
+        _apply_cartesian_interactions(chart)
+        charts[str(metric)] = chart
+    return build_dropdown_plot_response(charts, dropdown_label="Metric")
+
+
 def _asset_verification_tooltip() -> JsCode:
     """Return verification tooltip JS for asset history plots."""
     return JsCode(
@@ -646,7 +846,7 @@ def _asset_verification_tooltip() -> JsCode:
         "    return params.name;"
         "  }"
         "  function escapeHtml(raw) {"
-        "    return String(raw).replace(/[&<>\"]/g, function (match) {"
+        '    return String(raw).replace(/[&<>"]/g, function (match) {'
         "      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;'}[match];"
         "    });"
         "  }"
@@ -656,7 +856,7 @@ def _asset_verification_tooltip() -> JsCode:
         "  if (sourceText) {"
         "    var escapedSource = escapeHtml(sourceText);"
         "    sourceLine = '<br/>Source: <a href=\"' + escapedSource"
-        "      + '\" target=\"_blank\" rel=\"noopener noreferrer\">link</a>';"
+        '      + \'" target="_blank" rel="noopener noreferrer">link</a>\';'
         "  }"
         "  return '<strong>' + value[2] + '</strong>'"
         "    + '<br/>Frequency: ' + Number(value[1]).toFixed(4) + ' Hz'"
@@ -707,10 +907,7 @@ def _build_frequency_verification_asset_chart(
     line_series_names: list[str] = []
     if not actual_frame.empty:
         reference_order = (
-            actual_frame.groupby("reference_label")["reference_order"]
-            .min()
-            .sort_values(kind="stable")
-            .index.tolist()
+            actual_frame.groupby("reference_label")["reference_order"].min().sort_values(kind="stable").index.tolist()
         )
         for color_index, reference_label in enumerate(reference_order):
             color = _REFERENCE_LINE_COLORS[color_index % len(_REFERENCE_LINE_COLORS)]
@@ -816,7 +1013,7 @@ def plot_frequency_verification_comparison(data: pd.DataFrame) -> Any:
         "    return params.name;"
         "  }"
         "  function escapeHtml(raw) {"
-        "    return String(raw).replace(/[&<>\"]/g, function (match) {"
+        '    return String(raw).replace(/[&<>"]/g, function (match) {'
         "      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;'}[match];"
         "    });"
         "  }"
@@ -826,7 +1023,7 @@ def plot_frequency_verification_comparison(data: pd.DataFrame) -> Any:
         "  if (sourceText) {"
         "    var escapedSource = escapeHtml(sourceText);"
         "    sourceLine = '<br/>Source: <a href=\"' + escapedSource"
-        "      + '\" target=\"_blank\" rel=\"noopener noreferrer\">link</a>';"
+        '      + \'" target="_blank" rel="noopener noreferrer">link</a>\';'
         "  }"
         "  return '<strong>' + value[0] + '</strong>'"
         "    + '<br/>Frequency: ' + Number(value[1]).toFixed(4) + ' Hz'"
@@ -871,8 +1068,7 @@ def plot_frequency_verification_comparison(data: pd.DataFrame) -> Any:
             for color_index, reference_label in enumerate(reference_order):
                 reference_frame = actual_frame[actual_frame["reference_label"] == reference_label].sort_values("asset")
                 values_by_asset = {
-                    str(row["asset"]): float(row["y"])
-                    for row in reference_frame.to_dict(orient="records")
+                    str(row["asset"]): float(row["y"]) for row in reference_frame.to_dict(orient="records")
                 }
                 chart.add_yaxis(
                     str(reference_label),

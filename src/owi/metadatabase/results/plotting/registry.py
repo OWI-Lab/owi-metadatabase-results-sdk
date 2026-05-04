@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .definitions import PlotDefinition
 from .frequency_verification import (
+    build_delta_design_frequency_histogram_plot_definition,
     build_frequency_verification_asset_plot_definition,
     build_frequency_verification_plot_definition,
 )
@@ -27,11 +28,11 @@ def get_plot_definition(plot_type: str | None, analysis_name: str | None = None)
     if analysis_name is not None and analysis_name not in definition.supported_analysis_names:
         supported = ", ".join(sorted(definition.supported_analysis_names))
         raise ValueError(
-            f"Plot type {plot_type!r} does not support analysis {analysis_name!r}. "
-            f"Supported analyses: {supported}."
+            f"Plot type {plot_type!r} does not support analysis {analysis_name!r}. Supported analyses: {supported}."
         )
     return definition
 
 
 register_plot_definition(build_frequency_verification_plot_definition())
 register_plot_definition(build_frequency_verification_asset_plot_definition())
+register_plot_definition(build_delta_design_frequency_histogram_plot_definition())

@@ -624,6 +624,81 @@ def test_results_service_plot_results_supports_cross_analysis_fleetwide_without_
     assert [query.location_id for query in repository.queries] == [9, 9]
 
 
+def test_results_service_plot_results_supports_cross_analysis_delta_histogram() -> None:
+    frequency_analysis = LifetimeDesignFrequencies()
+    verification_analysis = LifetimeDesignVerification()
+    repository = MultiAnalysisRepository(
+        {
+            "LifetimeDesignFrequencies": pd.DataFrame(
+                [
+                    series.to_record_payload(analysis_id=17)
+                    for series in frequency_analysis.to_results(
+                        {
+                            "rows": [
+                                {
+                                    "turbine": "WFA03",
+                                    "reference": "INFL",
+                                    "FA1": 100.0,
+                                    "location_id": 9,
+                                },
+                                {
+                                    "turbine": "WFA03",
+                                    "reference": "ACTU",
+                                    "FA1": 80.0,
+                                    "location_id": 9,
+                                },
+                            ]
+                        }
+                    )
+                ]
+            ),
+            "LifetimeDesignVerification": pd.DataFrame(
+                [
+                    series.to_record_payload(analysis_id=19)
+                    for series in verification_analysis.to_results(
+                        {
+                            "rows": [
+                                {
+                                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                                    "turbine": "WFA03",
+                                    "FA1": 90.0,
+                                    "location_id": 9,
+                                },
+                                {
+                                    "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
+                                    "turbine": "WFA03",
+                                    "FA1": 110.0,
+                                    "location_id": 9,
+                                },
+                            ]
+                        }
+                    )
+                ]
+            ),
+        }
+    )
+    service = ResultsService(repository=repository)
+
+    response = service.plot_results(
+        filters={"location_id": 9},
+        plot_type="cross_analysis_fleetwide_delta_histogram",
+        source_filters={
+            "frequency": {"analysis_id": 17},
+            "verification": {"analysis_id": 19},
+        },
+    )
+    options = json.loads(response.json_options)
+    infl_series = next(series for series in options["FA1"]["series"] if series["name"] == "INFL")
+    actu_series = next(series for series in options["FA1"]["series"] if series["name"] == "ACTU")
+
+    assert options["FA1"]["title"][0]["show"] is False
+    assert options["FA1"]["xAxis"][0]["name"] == "Δ design frequency [%]"
+    assert options["FA1"]["yAxis"][0]["name"] == "# samples"
+    assert sum(infl_series["data"]) == 1
+    assert sum(actu_series["data"]) == 1
+    assert [query.analysis_id for query in repository.queries] == [17, 19]
+
+
 def test_results_service_cross_analysis_uses_parent_analysis_metadata_for_verification_plot() -> None:
     frequency_analysis = LifetimeDesignFrequencies()
     verification_analysis = LifetimeDesignVerification()

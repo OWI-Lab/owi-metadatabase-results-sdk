@@ -77,6 +77,10 @@ used after those sources are fetched and normalized. `ResultsService`
 resolves these definitions by `plot_type` before it falls back to the
 ordinary single-analysis plotting path.
 
+For example, the lifetime design frequency/verification workflow
+registers fleetwide, asset-level, and delta histogram plot definitions
+that all draw from the named `frequency` and `verification` sources.
+
 ### Adapter Pattern
 
 `ApiResultsRepository` wraps `ResultsAPI` to satisfy
