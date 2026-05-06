@@ -9,7 +9,7 @@ from .analyses import (
 from .endpoints import DEFAULT_RESULTS_ENDPOINTS, ResultsEndpoints
 from .io import ResultsAPI
 
-__version__ = "0.2.6"
+__version__ = "0.2.7"
 
 __all__ = [
     "BaseAnalysis",
