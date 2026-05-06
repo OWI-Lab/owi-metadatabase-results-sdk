@@ -350,7 +350,7 @@ print(retrieved_frame.head())
 
 ## Step 7 — Plot the Results
 
-The `ResultsService` provides four plot types relevant to this workflow:
+The `ResultsService` provides five plot types relevant to this workflow:
 
 | Plot type | Visualization |
 |-----------|---------------|
@@ -358,9 +358,15 @@ The `ResultsService` provides four plot types relevant to this workflow:
 | `comparison` | Metric values compared across turbines or grouped series. |
 | `water_depth_trend` | Verification frequency against absolute asset-location `elevation` water depth, with one dropdown entry per metric. |
 | `cross_analysis_fleetwide` | Fleetwide overlay combining persisted verification and frequency analyses. |
+| `cross_analysis_fleetwide_delta_histogram` | Fleetwide histogram of percentage delta between each design frequency reference and the latest verification value. |
 
-The cross-analysis fleetwide plot assumes you already have a matching
-`LifetimeDesignFrequencies` analysis persisted for the same assets.
+The cross-analysis plots assume you already have a matching
+`LifetimeDesignFrequencies` analysis persisted for the same assets. The
+delta histogram uses `(latest_verification - design_frequency) /
+design_frequency * 100` for each turbine, metric, and `reference_label`.
+It renders grouped bars by `reference_label`, with different colors and
+fill patterns. Rows without a matching latest verification value, or
+with missing or zero `design_frequency`, are skipped.
 The water-depth trend plot uses the absolute value of asset-location
 `elevation` as its x-coordinate and skips turbines where that value is
 missing.
@@ -381,18 +387,21 @@ graph TD
     C --> G["Comparison widget"]
     D --> H["Water-depth trend widget"]
     E --> I["Create cross-analysis fleetwide plot"]
+    E --> L["Create delta histogram plot"]
     I --> J["Fleetwide widget"]
+    L --> M["Delta histogram widget"]
     F --> K["Display plots"]
     G --> K
     H --> K
     J --> K
+    M --> K
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
 
-    class B,C,D,I api;
-    class E,F,G,H,J,K keep;
+    class B,C,D,I,L api;
+    class E,F,G,H,J,K,M keep;
     class A build;
 ```
 
@@ -428,11 +437,20 @@ cross_analysis_fleetwide_plot = results_service.plot_results(
     },
 )
 
+delta_histogram_plot = results_service.plot_results(
+    plot_type="cross_analysis_fleetwide_delta_histogram",
+    source_filters={
+        "frequency": {"analysis_id": frequency_analysis_id},
+        "verification": {"analysis_id": verification_analysis_id},
+    },
+)
+
 # Display in a notebook environment.
 display(time_series_plot.notebook)
 display(comparison_plot.notebook)
 display(water_depth_trend_plot.notebook)
 display(cross_analysis_fleetwide_plot.notebook)
+display(delta_histogram_plot.notebook)
 ```
 
 ---
@@ -445,8 +463,8 @@ display(cross_analysis_fleetwide_plot.notebook)
 - How to conditionally create or reuse analyses and upload result rows
   with `create_or_update_results_bulk`.
 - How to retrieve and reconstruct typed result series from persisted data.
-- How to render time-series, comparison, water-depth trend, and cross-analysis fleetwide plots
-  through `ResultsService`.
+- How to render time-series, comparison, water-depth trend, cross-analysis fleetwide, and
+  delta histogram plots through `ResultsService`.
 
 ## Next Steps
 

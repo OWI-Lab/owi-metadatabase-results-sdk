@@ -107,6 +107,32 @@ plot = service.plot_results(
 display(plot.notebook)
 ```
 
+### Cross-analysis Delta Histogram Plot
+
+Fleetwide histogram comparing each design frequency reference with the
+latest available design verification value for the same turbine and
+metric. The x-axis is `Δ design frequency [%]`, calculated as
+`(latest_verification - design_frequency) / design_frequency * 100`, and
+the y-axis is `# samples`. Each metric is available from the dropdown;
+within each metric, bars are grouped by `reference_label` using shared
+histogram bins so the counts align. The chart has no title, keeps a
+`reference_label` legend, and differentiates references by both color and
+fill pattern.
+
+Rows without a matching latest verification value, or with missing or
+zero `design_frequency`, are skipped.
+
+```python
+plot = service.plot_results(
+    plot_type="cross_analysis_fleetwide_delta_histogram",
+    source_filters={
+        "frequency": {"analysis_id": 46},
+        "verification": {"analysis_id": 50},
+    },
+)
+display(plot.notebook)
+```
+
 ### Cross-analysis Asset Plot
 
 Asset-level overlay combining verification points over time with dashed

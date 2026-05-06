@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from owi.metadatabase.results.plotting.frequency_verification import (
+    plot_delta_design_frequency_histogram,
     plot_frequency_verification_asset_history,
     plot_frequency_verification_comparison,
 )
@@ -91,6 +92,68 @@ def _sample_frequency_verification_frame() -> pd.DataFrame:
 def _sample_asset_frequency_verification_frame() -> pd.DataFrame:
     frame = _sample_frequency_verification_frame()
     return frame[frame["asset"] == "WFA03"].reset_index(drop=True)
+
+
+def _sample_delta_histogram_frame() -> pd.DataFrame:
+    return pd.DataFrame(
+        [
+            {
+                "asset": "WFA01",
+                "metric": "FA1",
+                "reference_label": "INFL",
+                "reference_order": 1,
+                "design_frequency": 100.0,
+                "verification_frequency": 105.0,
+                "timestamp_label": "2024-01-03T00:00:00+00:00",
+                "timestamp_epoch": 1704240000.0,
+                "delta_design_frequency_percent": 5.0,
+            },
+            {
+                "asset": "WFA02",
+                "metric": "FA1",
+                "reference_label": "INFL",
+                "reference_order": 1,
+                "design_frequency": 100.0,
+                "verification_frequency": 104.0,
+                "timestamp_label": "2024-01-03T00:00:00+00:00",
+                "timestamp_epoch": 1704240000.0,
+                "delta_design_frequency_percent": 4.0,
+            },
+            {
+                "asset": "WFA01",
+                "metric": "FA1",
+                "reference_label": "ACTU",
+                "reference_order": 2,
+                "design_frequency": 100.0,
+                "verification_frequency": 101.0,
+                "timestamp_label": "2024-01-03T00:00:00+00:00",
+                "timestamp_epoch": 1704240000.0,
+                "delta_design_frequency_percent": 1.0,
+            },
+            {
+                "asset": "WFA02",
+                "metric": "FA1",
+                "reference_label": "ACTU",
+                "reference_order": 2,
+                "design_frequency": 100.0,
+                "verification_frequency": 99.0,
+                "timestamp_label": "2024-01-03T00:00:00+00:00",
+                "timestamp_epoch": 1704240000.0,
+                "delta_design_frequency_percent": -1.0,
+            },
+            {
+                "asset": "WFA01",
+                "metric": "SS1",
+                "reference_label": "INFL",
+                "reference_order": 1,
+                "design_frequency": 100.0,
+                "verification_frequency": 102.0,
+                "timestamp_label": "2024-01-03T00:00:00+00:00",
+                "timestamp_epoch": 1704240000.0,
+                "delta_design_frequency_percent": 2.0,
+            },
+        ]
+    )
 
 
 class TestFrequencyVerificationComparisonPlot:
@@ -340,3 +403,42 @@ class TestFrequencyVerificationAssetHistoryPlot:
     def test_requires_single_asset_after_filtering(self) -> None:
         with pytest.raises(ValueError, match="expects data for one asset"):
             plot_frequency_verification_asset_history(_sample_frequency_verification_frame())
+
+
+class TestDeltaDesignFrequencyHistogramPlot:
+    def test_empty_data_raises(self) -> None:
+        with pytest.raises(ValueError, match="No delta design frequency data"):
+            plot_delta_design_frequency_histogram(pd.DataFrame())
+
+    def test_returns_metric_dropdown_with_grouped_reference_bars(self) -> None:
+        response = plot_delta_design_frequency_histogram(_sample_delta_histogram_frame())
+        assert response.frontend_spec is not None
+        assert response.frontend_spec["mode"] == "dropdown"
+        assert set(response.frontend_spec["options_by_key"]) == {"FA1", "SS1"}
+
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+        infl_series = next(series for series in fa1_chart["series"] if series["name"] == "INFL")
+        actu_series = next(series for series in fa1_chart["series"] if series["name"] == "ACTU")
+
+        assert fa1_chart["title"][0]["show"] is False
+        assert fa1_chart["legend"][0]["data"] == ["INFL", "ACTU"]
+        assert fa1_chart["xAxis"][0]["name"] == "Δ design frequency [%]"
+        assert fa1_chart["yAxis"][0]["name"] == "# samples"
+        assert infl_series["type"] == "bar"
+        assert actu_series["type"] == "bar"
+        assert infl_series.get("stack") is None
+        assert actu_series.get("stack") is None
+        assert sum(infl_series["data"]) == 2
+        assert sum(actu_series["data"]) == 2
+
+    def test_reference_bars_use_distinct_colors_and_decals(self) -> None:
+        response = plot_delta_design_frequency_histogram(_sample_delta_histogram_frame())
+        assert response.frontend_spec is not None
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+        infl_series = next(series for series in fa1_chart["series"] if series["name"] == "INFL")
+        actu_series = next(series for series in fa1_chart["series"] if series["name"] == "ACTU")
+
+        assert infl_series["itemStyle"]["color"] != actu_series["itemStyle"]["color"]
+        assert infl_series["itemStyle"]["decal"] != actu_series["itemStyle"]["decal"]
+        assert fa1_chart["aria"]["decal"]["show"] is True
+        assert "Δ design frequency:" in infl_series["tooltip"]["formatter"]

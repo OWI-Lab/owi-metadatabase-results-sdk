@@ -340,7 +340,7 @@ print(retrieved_frame.head())
 
 ## Step 7 — Plot the Results
 
-The `ResultsService` provides four plot types relevant to this workflow:
+The `ResultsService` provides five plot types relevant to this workflow:
 
 | Plot type | Visualization |
 |-----------|---------------|
@@ -348,9 +348,15 @@ The `ResultsService` provides four plot types relevant to this workflow:
 | `location` | Values grouped by turbine with a metric dropdown. |
 | `geo` | Results projected onto a geographic site map. |
 | `cross_analysis_fleetwide` | Fleetwide overlay combining persisted frequency and verification analyses. |
+| `cross_analysis_fleetwide_delta_histogram` | Fleetwide histogram of percentage delta between each design frequency reference and the latest verification value. |
 
-The cross-analysis fleetwide plot assumes you already have a matching
-`LifetimeDesignVerification` analysis persisted for the same assets.
+The cross-analysis plots assume you already have a matching
+`LifetimeDesignVerification` analysis persisted for the same assets. The
+delta histogram uses `(latest_verification - design_frequency) /
+design_frequency * 100` for each turbine, metric, and `reference_label`.
+It renders grouped bars by `reference_label`, with different colors and
+fill patterns. Rows without a matching latest verification value, or
+with missing or zero `design_frequency`, are skipped.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {
@@ -368,18 +374,21 @@ graph TD
     C --> G["Location widget"]
     D --> H["Geo widget"]
     E --> I["Create cross-analysis fleetwide plot"]
+    E --> L["Create delta histogram plot"]
     I --> J["Fleetwide widget"]
+    L --> M["Delta histogram widget"]
     F --> K["Display plots"]
     G --> K
     H --> K
     J --> K
+    M --> K
 
     classDef api fill:#CFE0F5,stroke:#0B5CAD,color:#062B5B;
     classDef keep fill:#DCEFD8,stroke:#2E7D32,color:#103816;
     classDef build fill:#F3E3BF,stroke:#A56A00,color:#4A3200;
 
-    class B,C,D,I api;
-    class E,F,G,H,J,K keep;
+    class B,C,D,I,L api;
+    class E,F,G,H,J,K,M keep;
     class A build;
 ```
 
@@ -415,11 +424,20 @@ cross_analysis_fleetwide_plot = results_service.plot_results(
     },
 )
 
+delta_histogram_plot = results_service.plot_results(
+    plot_type="cross_analysis_fleetwide_delta_histogram",
+    source_filters={
+        "frequency": {"analysis_id": frequency_analysis_id},
+        "verification": {"analysis_id": verification_analysis_id},
+    },
+)
+
 # Display in a notebook environment.
 display(comparison_plot.notebook)
 display(location_plot.notebook)
 display(geo_plot.notebook)
 display(cross_analysis_fleetwide_plot.notebook)
+display(delta_histogram_plot.notebook)
 ```
 
 ---
@@ -432,8 +450,8 @@ display(cross_analysis_fleetwide_plot.notebook)
 - How to conditionally create or reuse analyses and upload result rows
   with `create_or_update_results_bulk`.
 - How to retrieve and reconstruct typed result series from persisted data.
-- How to render comparison, location, geo, and cross-analysis fleetwide plots through
-  `ResultsService`.
+- How to render comparison, location, geo, cross-analysis fleetwide, and delta histogram
+  plots through `ResultsService`.
 
 ## Next Steps
 
