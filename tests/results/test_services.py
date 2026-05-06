@@ -60,6 +60,19 @@ class StubLocationRepository(StubRepository):
         return pd.DataFrame(result)
 
 
+class StubLocationAnalysisRepository(StubLocationRepository):
+    """Repository stub that exposes location and parent analysis metadata."""
+
+    def __init__(self, frame: pd.DataFrame, location_frame: pd.DataFrame, analysis_frame: pd.DataFrame) -> None:
+        super().__init__(frame, location_frame)
+        self.analysis_frame = analysis_frame
+        self.analysis_queries: list[int] = []
+
+    def get_analysis(self, analysis_id: int) -> pd.DataFrame:
+        self.analysis_queries.append(analysis_id)
+        return self.analysis_frame[self.analysis_frame["id"] == analysis_id].copy()
+
+
 class MultiAnalysisRepository(StubRepository):
     """Repository stub that returns different result frames per analysis name."""
 
@@ -189,6 +202,55 @@ def test_results_service_plot_results_supports_verification_sparse_boundary_gap(
     assert comparison_options["WFA03"]["xAxis"][0]["boundaryGap"] is True
 
 
+def test_results_service_plot_results_supports_verification_water_depth_trend() -> None:
+    analysis = LifetimeDesignVerification()
+    results = analysis.to_results(
+        {
+            "rows": [
+                {
+                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                    "turbine": "WFA01",
+                    "FA1": 0.3406,
+                    "location_id": 9,
+                },
+                {
+                    "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
+                    "turbine": "WFA02",
+                    "FA1": 0.3415,
+                    "location_id": 10,
+                },
+                {
+                    "timestamp": datetime(2024, 1, 3, tzinfo=timezone.utc),
+                    "turbine": "WFA03",
+                    "FA1": 0.3421,
+                    "location_id": 11,
+                },
+            ]
+        }
+    )
+    frame = pd.DataFrame([series.to_record_payload(analysis_id=19) for series in results])
+    location_frame = pd.DataFrame(
+        [
+            {"id": 9, "title": "WFA01", "elevation": -21.5},
+            {"id": 10, "title": "WFA02", "elevation": -28.0},
+            {"id": 11, "title": "WFA03", "elevation": None},
+        ]
+    )
+    analysis_frame = pd.DataFrame([{"id": 19, "source_url": "https://example.test/source"}])
+    repository = StubLocationAnalysisRepository(frame, location_frame, analysis_frame)
+    service = ResultsService(repository=repository)
+
+    response = service.plot_results("LifetimeDesignVerification", plot_type="water_depth_trend")
+    options = json.loads(response.json_options)
+    verification_series = next(series for series in options["FA1"]["series"] if series["name"] == "Verification")
+
+    assert options["FA1"]["xAxis"][0]["name"] == "Water depth [m]"
+    assert [point["value"][0] for point in verification_series["data"]] == [21.5, 28.0]
+    assert [point["value"][2] for point in verification_series["data"]] == ["WFA01", "WFA02"]
+    assert {point["value"][4] for point in verification_series["data"]} == {"https://example.test/source"}
+    assert repository.analysis_queries == [19]
+
+
 def test_results_service_get_results() -> None:
     analysis = WindSpeedHistogram()
     series = analysis.to_results(
@@ -285,8 +347,8 @@ def test_results_service_get_location_frame_filters_requested_ids() -> None:
             pd.DataFrame(),
             pd.DataFrame(
                 [
-                    {"id": 9, "title": "WFA03", "northing": 51.5, "easting": 2.8},
-                    {"id": 10, "title": "WFB07", "northing": 51.6, "easting": 2.9},
+                    {"id": 9, "title": "WFA03", "northing": 51.5, "easting": 2.8, "elevation": 21.5},
+                    {"id": 10, "title": "WFB07", "northing": 51.6, "easting": 2.9, "elevation": 28.0},
                 ]
             ),
         )
@@ -295,7 +357,8 @@ def test_results_service_get_location_frame_filters_requested_ids() -> None:
     location_frame = service.get_location_frame([10])
 
     assert list(location_frame["id"]) == [10]
-    assert list(location_frame.columns) == ["id", "title", "northing", "easting"]
+    assert list(location_frame.columns) == ["id", "title", "northing", "easting", "elevation"]
+    assert list(location_frame["elevation"]) == [28.0]
 
 
 def test_results_service_get_location_frame_empty_ids_returns_empty_schema() -> None:
@@ -304,7 +367,7 @@ def test_results_service_get_location_frame_empty_ids_returns_empty_schema() -> 
     location_frame = service.get_location_frame([])
 
     assert location_frame.empty
-    assert list(location_frame.columns) == ["id", "title", "northing", "easting"]
+    assert list(location_frame.columns) == ["id", "title", "northing", "easting", "elevation"]
 
 
 def test_lifetime_design_frequencies_to_results() -> None:
@@ -913,7 +976,7 @@ class TestGetLocationFrameEdgeCases:
         service = ResultsService(repository=StubRepository(pd.DataFrame()))
         frame = service.get_location_frame([9])
         assert frame.empty
-        assert list(frame.columns) == ["id", "title", "northing", "easting"]
+        assert list(frame.columns) == ["id", "title", "northing", "easting", "elevation"]
 
     def test_get_location_frame_returns_non_dataframe(self) -> None:
         """If get_location_frame returns non-DataFrame, service returns empty schema."""
@@ -930,7 +993,7 @@ class TestGetLocationFrameEdgeCases:
         service = ResultsService(
             repository=StubLocationRepository(
                 pd.DataFrame(),
-                pd.DataFrame(columns=["id", "title", "northing", "easting"]),
+                pd.DataFrame(columns=["id", "title", "northing", "easting", "elevation"]),
             )
         )
         frame = service.get_location_frame([999])

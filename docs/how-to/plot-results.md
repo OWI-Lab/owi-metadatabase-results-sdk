@@ -72,6 +72,23 @@ plot = service.plot_results(
 display(plot.notebook)
 ```
 
+### Water-depth Trend Plot
+
+Scatter chart for `LifetimeDesignVerification` results with one dropdown
+entry per metric. The x-axis uses each turbine's asset-location
+`elevation` as absolute water depth, and the y-axis uses the
+verification frequency value. Turbines without an `elevation` value are
+skipped.
+
+```python
+plot = service.plot_results(
+    "LifetimeDesignVerification",
+    filters={"analysis_id": 50},
+    plot_type="water_depth_trend",
+)
+display(plot.notebook)
+```
+
 ### Cross-analysis Fleetwide Plot
 
 Fleetwide overlay combining actual frequency reference lines with
