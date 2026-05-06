@@ -83,6 +83,19 @@ class TestHistogramPlotStrategy:
         assert response.html
         options = json.loads(response.json_options)
         assert "series" in options
+        assert options["yAxis"][0]["scale"] is True
+        assert options["dataZoom"][0]["type"] == "inside"
+        assert options["dataZoom"][0]["start"] == 0
+        assert options["dataZoom"][0]["end"] == 100
+        assert options["dataZoom"][0]["moveOnMouseMove"] is True
+        assert options["dataZoom"][1]["type"] == "slider"
+        toolbox_feature = options["toolbox"]["feature"]
+        assert list(toolbox_feature) == ["dataZoom", "restore", "saveAsImage"]
+        assert toolbox_feature["dataZoom"]["title"] == {"zoom": "Zoom", "back": "Reset Zoom"}
+        assert toolbox_feature["restore"]["show"] is True
+        assert toolbox_feature["saveAsImage"]["type"] == "png"
+        assert toolbox_feature["saveAsImage"]["title"] == "Download as PNG"
+        assert toolbox_feature["dataZoom"]["show"] is True
         assert response.frontend_spec is not None
         assert response.frontend_spec["renderer"] == "echarts"
         assert response.frontend_spec["mode"] == "single"
@@ -117,6 +130,7 @@ class TestTimeSeriesPlotStrategy:
         assert isinstance(response, PlotResponse)
         options = json.loads(response.json_options)
         assert options["title"][0]["text"] == "Custom Title"
+        assert options["xAxis"][0]["boundaryGap"] is True
         assert response.frontend_spec is not None
         assert response.frontend_spec["mode"] == "single"
         assert response.frontend_spec["option"]["title"][0]["text"] == "Custom Title"
@@ -128,6 +142,21 @@ class TestTimeSeriesPlotStrategy:
         response = strategy.render(data, request)
         options = json.loads(response.json_options)
         assert options["title"][0]["text"] == "MyAnalysis"
+
+    def test_render_uses_no_boundary_gap_for_dense_series(self) -> None:
+        strategy = TimeSeriesPlotStrategy()
+        data = pd.DataFrame(
+            [
+                {"series_name": "S1", "x": "2024-01-01", "y": 1.0},
+                {"series_name": "S1", "x": "2024-01-02", "y": 2.0},
+                {"series_name": "S1", "x": "2024-01-03", "y": 3.0},
+                {"series_name": "S1", "x": "2024-01-04", "y": 4.0},
+            ]
+        )
+        request = PlotRequest(analysis_name="MyAnalysis")
+        response = strategy.render(data, request)
+        options = json.loads(response.json_options)
+        assert options["xAxis"][0]["boundaryGap"] is False
 
 
 class TestGetPlotStrategy:
@@ -199,6 +228,7 @@ class TestBuildDropdownPlotResponse:
         assert response.notebook is not None
         assert "ResizeObserver" in response.notebook.data
         assert "window.frameElement.style.height" in response.notebook.data
+        assert 'sandbox="allow-downloads allow-scripts allow-same-origin"' in response.notebook.data
 
     def test_prefers_widget_notebook_renderer_when_available(self) -> None:
         chart = Bar()

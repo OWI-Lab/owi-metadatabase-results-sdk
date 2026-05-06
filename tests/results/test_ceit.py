@@ -219,4 +219,6 @@ class TestPlotCeitAnalyses:
 
     def test_processed_frame_renders(self) -> None:
         response = plot_ceit_analyses(ceit_frame_from_measurements([_sample_row()]))
+        options_by_sensor = json.loads(response.json_options)
         assert "DA8F" in response.html
+        assert options_by_sensor["DA8F"]["xAxis"][0]["boundaryGap"] is True

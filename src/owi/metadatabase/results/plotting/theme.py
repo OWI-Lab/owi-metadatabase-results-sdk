@@ -59,6 +59,7 @@ def _yaxis_opts(*, name: str) -> opts.AxisOpts:
     """Return cartesian y-axis options with monospace text."""
     return opts.AxisOpts(
         name=name,
+        is_scale=True,
         axislabel_opts=_label_opts(),
         name_textstyle_opts=_text_style_opts(),
     )
@@ -94,6 +95,62 @@ def _apply_cartesian_layout(chart: ChartLike) -> None:
         grid.update(_CARTESIAN_GRID)
         return
     chart.options["grid"] = dict(_CARTESIAN_GRID)
+
+
+def _plot_toolbox_opts(*, include_data_zoom: bool) -> opts.ToolboxOpts:
+    """Return built-in toolbox controls for plot reset and image export."""
+    feature: dict[str, Any] = {}
+    if include_data_zoom:
+        feature["dataZoom"] = opts.ToolBoxFeatureDataZoomOpts(
+            zoom_title="Zoom",
+            back_title="Reset Zoom",
+        ).opts
+    feature["restore"] = opts.ToolBoxFeatureRestoreOpts(title="Reset").opts
+    feature["saveAsImage"] = opts.ToolBoxFeatureSaveAsImageOpts(
+        type_="png",
+        title="Download as PNG",
+        exclude_components=["toolbox", "dataZoom"],
+    ).opts
+    return opts.ToolboxOpts(
+        pos_left=None,
+        pos_right="2%",
+        pos_top="2%",
+        feature=feature,
+    )
+
+
+def _cartesian_datazoom_opts() -> list[opts.DataZoomOpts]:
+    """Return built-in x-axis zoom/pan controls for cartesian plots."""
+    return [
+        opts.DataZoomOpts(
+            type_="inside",
+            range_start=0,
+            range_end=100,
+            xaxis_index=[0],
+            is_zoom_on_mouse_wheel=True,
+            is_move_on_mouse_move=True,
+            is_move_on_mouse_wheel=True,
+        ),
+        opts.DataZoomOpts(
+            type_="slider",
+            range_start=0,
+            range_end=100,
+            xaxis_index=[0],
+            pos_bottom="4%",
+            height=18,
+        ),
+    ]
+
+
+def _apply_cartesian_interactions(chart: ChartLike) -> None:
+    """Attach built-in zoom, pan, reset, and PNG export controls."""
+    chart.options["dataZoom"] = [datazoom_opts.opts for datazoom_opts in _cartesian_datazoom_opts()]
+    chart.options["toolbox"] = _plot_toolbox_opts(include_data_zoom=True).opts
+
+
+def _apply_export_reset_toolbox(chart: ChartLike) -> None:
+    """Attach built-in reset and PNG export controls without cartesian zoom."""
+    chart.options["toolbox"] = _plot_toolbox_opts(include_data_zoom=False).opts
 
 
 def _selected_option_suffix(key: str, selected_key: str) -> str:

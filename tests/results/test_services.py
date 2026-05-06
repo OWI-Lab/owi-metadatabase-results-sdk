@@ -12,7 +12,7 @@ from owi.metadatabase.results import LifetimeDesignFrequencies, WindSpeedHistogr
 from owi.metadatabase.results.analyses.lifetime_design_verification import LifetimeDesignVerification
 from owi.metadatabase.results.models import ResultQuery
 from owi.metadatabase.results.serializers import DjangoResultSerializer
-from owi.metadatabase.results.services import ResultsService
+from owi.metadatabase.results.services import ApiResultsRepository, ResultsService
 from owi.metadatabase.results.services import get_results as module_get_results
 from owi.metadatabase.results.services import plot_results as module_plot_results
 
@@ -73,6 +73,23 @@ class MultiAnalysisRepository(StubRepository):
         return self.frames_by_analysis.get(query.analysis_name, pd.DataFrame())
 
 
+def test_api_results_repository_list_results_uses_rest_id_filters() -> None:
+    class RecordingApi:
+        def __init__(self) -> None:
+            self.kwargs: dict[str, Any] | None = None
+
+        def list_results(self, **kwargs: Any) -> dict[str, pd.DataFrame]:
+            self.kwargs = kwargs
+            return {"data": pd.DataFrame()}
+
+    api = RecordingApi()
+    repository = ApiResultsRepository(api=api)  # type: ignore[arg-type]
+
+    repository.list_results(ResultQuery(analysis_id=17, location_id=9))
+
+    assert api.kwargs == {"analysis__id": 17, "location__id": 9}
+
+
 def test_wind_speed_histogram_to_results_and_plot() -> None:
     analysis = WindSpeedHistogram()
     results = analysis.to_results(
@@ -122,6 +139,39 @@ def test_lifetime_design_verification_to_results() -> None:
     )
     assert len(results) == 2
     assert results[0].location_id == 5
+
+
+def test_results_service_plot_results_supports_verification_sparse_boundary_gap() -> None:
+    analysis = LifetimeDesignVerification()
+    results = analysis.to_results(
+        {
+            "rows": [
+                {
+                    "timestamp": datetime(2024, 1, 1, tzinfo=timezone.utc),
+                    "turbine": "WFA03",
+                    "FA1": 0.356,
+                    "location_id": 5,
+                },
+                {
+                    "timestamp": datetime(2024, 1, 2, tzinfo=timezone.utc),
+                    "turbine": "WFA03",
+                    "FA1": 0.355,
+                    "location_id": 5,
+                },
+            ]
+        }
+    )
+    frame = pd.DataFrame([series.to_record_payload(analysis_id=19) for series in results])
+    service = ResultsService(repository=StubRepository(frame))
+
+    time_series_response = service.plot_results("LifetimeDesignVerification", plot_type="time_series")
+    comparison_response = service.plot_results("LifetimeDesignVerification", plot_type="comparison")
+
+    time_series_options = json.loads(time_series_response.json_options)
+    comparison_options = json.loads(comparison_response.json_options)
+
+    assert time_series_options["FA1"]["xAxis"][0]["boundaryGap"] is True
+    assert comparison_options["WFA03"]["xAxis"][0]["boundaryGap"] is True
 
 
 def test_results_service_get_results() -> None:

@@ -14,6 +14,7 @@ from ..models import ResultQuery
 from .definitions import PlotDefinition, PlotSourceData, PlotSourceSpec
 from .response import build_dropdown_plot_response
 from .theme import (
+    _apply_cartesian_interactions,
     _apply_cartesian_layout,
     _label_opts,
     _legend_opts,
@@ -413,12 +414,13 @@ def _build_frequency_verification_asset_chart(
         title_opts=opts.TitleOpts(is_show=False),
         legend_opts=_legend_opts(),
         tooltip_opts=_tooltip_opts(trigger="item"),
-        xaxis_opts=_xaxis_opts(name="Datetime", rotate=30, boundary_gap=False),
+        xaxis_opts=_xaxis_opts(name="Datetime", boundary_gap=1 <= len(x_values) <= 3),
         yaxis_opts=_yaxis_opts(name="Frequency [Hz]"),
     )
     _set_line_legend(chart, line_series_names)
     _apply_cartesian_layout(chart)
     _set_legend_only_layout(chart)
+    _apply_cartesian_interactions(chart)
     return chart
 
 
@@ -553,5 +555,6 @@ def plot_frequency_verification_comparison(data: pd.DataFrame) -> Any:
         _set_line_legend(chart, line_series_names)
         _apply_cartesian_layout(chart)
         _set_legend_only_layout(chart)
+        _apply_cartesian_interactions(chart)
         charts[str(metric)] = chart
     return build_dropdown_plot_response(charts, dropdown_label="Metric")
