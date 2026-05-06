@@ -129,11 +129,13 @@ class LifetimeDesignVerification(BaseAnalysis):
                 y_value = y_values[index]
                 rows.append(
                     {
+                        "analysis_id": result.analysis_id,
                         "x": datetime.fromtimestamp(x_value, tz=timezone.utc).isoformat(),
                         "y": y_value,
                         "series_name": result.short_description,
                         "turbine": turbine,
                         "metric": metric,
+                        "result_additional_data": result.data_additional,
                     }
                 )
         return pd.DataFrame(rows)

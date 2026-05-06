@@ -140,7 +140,7 @@ class TestFrequencyVerificationComparisonPlot:
 
         assert reference_series["symbolSize"] == 5
         assert verification_series["symbolSize"] == 8
-        assert verification_series["itemStyle"]["color"] == "#d62728"
+        assert verification_series["itemStyle"]["color"] == "#000000"
 
     def test_uses_custom_tooltips_for_frequency_and_verification(self) -> None:
         response = plot_frequency_verification_comparison(_sample_frequency_verification_frame())
@@ -155,6 +155,100 @@ class TestFrequencyVerificationComparisonPlot:
         assert "params.seriesName" in reference_series["tooltip"]["formatter"]
         assert "<strong>' + value[0] + '</strong>'" in verification_series["tooltip"]["formatter"]
         assert "Timestamp:" in verification_series["tooltip"]["formatter"]
+        assert "Source:" in verification_series["tooltip"]["formatter"]
+        assert ">link</a>" in verification_series["tooltip"]["formatter"]
+        assert "/^https?" not in response.chart.dump_options()
+        assert "if (sourceText)" in response.chart.dump_options()
+
+    def test_verification_hover_carries_parent_analysis_source_url(self) -> None:
+        frame = _sample_frequency_verification_frame()
+        frame.loc[frame["timestamp_label"].notna(), "source_url"] = "https://example.test/source"
+
+        response = plot_frequency_verification_comparison(frame)
+        assert response.frontend_spec is not None
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+        verification_series = next(series for series in fa1_chart["series"] if series["name"] == "Verification")
+
+        assert verification_series["tooltip"]["enterable"] is True
+        assert {point["value"][4] for point in verification_series["data"]} == {"https://example.test/source"}
+
+    def test_result_level_permissable_frequency_adds_red_band(self) -> None:
+        frame = _sample_frequency_verification_frame()
+        frame.loc[frame["timestamp_label"].notna(), "result_permissable_frequency_lower"] = 1.7
+        frame.loc[frame["timestamp_label"].notna(), "result_permissable_frequency_upper"] = 2.8
+
+        response = plot_frequency_verification_comparison(frame)
+        assert response.frontend_spec is not None
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+
+        reference_series = next(series for series in fa1_chart["series"] if series["name"] == "Ref 1")
+        limit_series = next(
+            series for series in fa1_chart["series"] if series["name"] == "_Permissable Frequency Limits"
+        )
+
+        assert fa1_chart["legend"][0]["data"] == ["Ref 1", "Ref 2", "Ref 3"]
+        assert reference_series["markArea"]["data"] == [[{"yAxis": 1.7}, {"yAxis": 2.8}]]
+        assert reference_series["markArea"]["itemStyle"]["color"] == "#d62728"
+        assert reference_series["markArea"]["itemStyle"]["opacity"] == pytest.approx(0.35)
+        assert limit_series["type"] == "scatter"
+        assert limit_series["symbolSize"] == 0
+        assert limit_series["itemStyle"]["opacity"] == 0
+        assert [point["value"][1] for point in limit_series["data"]] == [1.7, 2.8, 1.7, 2.8]
+        assert "min" not in fa1_chart["yAxis"][0]
+        assert "max" not in fa1_chart["yAxis"][0]
+
+    def test_result_level_permissable_frequency_uses_asset_limits_and_metric_fallback(self) -> None:
+        frame = _sample_frequency_verification_frame()
+        verification_mask = frame["timestamp_label"].notna()
+        frame.loc[verification_mask & (frame["asset"] == "WFA03"), "result_permissable_frequency_lower"] = 1.7
+        frame.loc[verification_mask & (frame["asset"] == "WFA03"), "result_permissable_frequency_upper"] = 2.8
+        frame.loc[verification_mask & (frame["asset"] == "WFB07"), "result_permissable_frequency_lower"] = 1.6
+        frame.loc[verification_mask & (frame["asset"] == "WFB07"), "result_permissable_frequency_upper"] = 2.5
+        frame = pd.concat(
+            [
+                frame,
+                pd.DataFrame(
+                    [
+                        {
+                            "asset": "WFC09",
+                            "metric": "fa1",
+                            "y": 2.1122,
+                            "timestamp_label": "2024-01-11T00:00:00+00:00",
+                            "hover_name": "WFC09",
+                        }
+                    ]
+                ),
+            ],
+            ignore_index=True,
+        )
+
+        response = plot_frequency_verification_comparison(frame)
+        assert response.frontend_spec is not None
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+        lower_series = next(
+            series for series in fa1_chart["series"] if series["name"] == "_Permissable Frequency Lower"
+        )
+        band_series = next(series for series in fa1_chart["series"] if series["name"] == "Permissable Frequency Band")
+
+        assert fa1_chart["xAxis"][0]["data"] == ["WFA03", "WFB07", "WFC09"]
+        assert lower_series["data"] == pytest.approx([1.7, 1.6, 1.6])
+        assert band_series["data"] == pytest.approx([1.1, 0.9, 1.2])
+
+    def test_analysis_level_permissable_frequency_is_used_when_result_level_missing(self) -> None:
+        frame = _sample_frequency_verification_frame()
+        frame.loc[frame["timestamp_label"].notna(), "analysis_permissable_frequency_lower"] = 1.4
+        frame.loc[frame["timestamp_label"].notna(), "analysis_permissable_frequency_upper"] = 2.9
+
+        response = plot_frequency_verification_comparison(frame)
+        assert response.frontend_spec is not None
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+        reference_series = next(series for series in fa1_chart["series"] if series["name"] == "Ref 1")
+        limit_series = next(
+            series for series in fa1_chart["series"] if series["name"] == "_Permissable Frequency Limits"
+        )
+
+        assert reference_series["markArea"]["data"] == [[{"yAxis": 1.4}, {"yAxis": 2.9}]]
+        assert [point["value"][1] for point in limit_series["data"]] == [1.4, 2.9, 1.4, 2.9]
 
 
 class TestFrequencyVerificationAssetHistoryPlot:
@@ -207,7 +301,7 @@ class TestFrequencyVerificationAssetHistoryPlot:
 
         assert verification_series["type"] == "scatter"
         assert verification_series["symbolSize"] == 8
-        assert verification_series["itemStyle"]["color"] == "#d62728"
+        assert verification_series["itemStyle"]["color"] == "#000000"
         assert opacities == [1.0, 1.0]
 
     def test_verification_hover_keeps_asset_frequency_and_timestamp_content(self) -> None:
@@ -219,6 +313,29 @@ class TestFrequencyVerificationAssetHistoryPlot:
         assert "<strong>' + value[2] + '</strong>'" in verification_series["tooltip"]["formatter"]
         assert "Frequency:" in verification_series["tooltip"]["formatter"]
         assert "Timestamp:" in verification_series["tooltip"]["formatter"]
+        assert "Source:" in verification_series["tooltip"]["formatter"]
+        assert ">link</a>" in verification_series["tooltip"]["formatter"]
+        assert "/^https?" not in response.chart.dump_options()
+        assert "if (sourceText)" in response.chart.dump_options()
+
+    def test_asset_history_renders_permissable_frequency_band(self) -> None:
+        frame = _sample_asset_frequency_verification_frame()
+        frame.loc[frame["timestamp_label"].notna(), "result_permissable_frequency_lower"] = 1.7
+        frame.loc[frame["timestamp_label"].notna(), "result_permissable_frequency_upper"] = 2.8
+
+        response = plot_frequency_verification_asset_history(frame)
+        assert response.frontend_spec is not None
+        fa1_chart = response.frontend_spec["options_by_key"]["FA1"]
+
+        reference_series = next(series for series in fa1_chart["series"] if series["name"] == "Ref 1")
+        limit_series = next(
+            series for series in fa1_chart["series"] if series["name"] == "_Permissable Frequency Limits"
+        )
+
+        assert reference_series["markArea"]["data"] == [[{"yAxis": 1.7}, {"yAxis": 2.8}]]
+        assert [point["value"][1] for point in limit_series["data"]] == [1.7, 2.8, 1.7, 2.8]
+        assert "min" not in fa1_chart["yAxis"][0]
+        assert "max" not in fa1_chart["yAxis"][0]
 
     def test_requires_single_asset_after_filtering(self) -> None:
         with pytest.raises(ValueError, match="expects data for one asset"):

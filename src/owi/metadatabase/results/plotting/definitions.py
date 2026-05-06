@@ -28,6 +28,7 @@ class PlotSourceData:
     query: ResultQuery
     records: Sequence[ResultSeries]
     frame: pd.DataFrame
+    analysis_frame: pd.DataFrame | None = None
 
 
 @dataclass(frozen=True)

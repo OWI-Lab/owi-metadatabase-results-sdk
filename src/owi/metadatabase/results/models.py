@@ -87,6 +87,7 @@ class ResultSeries(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    analysis_id: int | None = None
     analysis_name: str
     analysis_kind: AnalysisKind
     result_scope: ResultScope

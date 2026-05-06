@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import Any, cast
 
 import pandas as pd
 from pyecharts import options as opts
-from pyecharts.charts import Line, Scatter
+from pyecharts.charts import Bar, Line, Scatter
 from pyecharts.commons.utils import JsCode
 
 from ..models import ResultQuery
@@ -28,7 +29,11 @@ LIFETIME_DESIGN_VERIFICATION_ANALYSIS_NAME = "LifetimeDesignVerification"
 _FREQUENCY_SOURCE_KEY = "frequency"
 _VERIFICATION_SOURCE_KEY = "verification"
 _REFERENCE_LINE_COLORS = ("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#8c564b", "#17becf")
-_VERIFICATION_COLOR = "#d62728"
+_VERIFICATION_COLOR = "#000000"
+_PERMISSABLE_FREQUENCY_KEY = "permissable_frequency"
+_PERMISSABLE_BAND_COLOR = "#d62728"
+_PERMISSABLE_BAND_OPACITY = 0.35
+_PERMISSABLE_BAND_STACK = "__permissable_frequency_band"
 _VERIFICATION_MIN_OPACITY = 0.3
 _REFERENCE_SYMBOL_SIZE = 5
 _VERIFICATION_SYMBOL_SIZE = 8
@@ -42,6 +47,11 @@ _NORMALIZED_COLUMNS = [
     "hover_name",
     "reference_label",
     "reference_order",
+    "source_url",
+    "result_permissable_frequency_lower",
+    "result_permissable_frequency_upper",
+    "analysis_permissable_frequency_lower",
+    "analysis_permissable_frequency_upper",
 ]
 _COMBINED_FREQUENCY_VERIFICATION_COLUMNS = list(_NORMALIZED_COLUMNS)
 
@@ -52,6 +62,98 @@ def _require_columns(frame: pd.DataFrame, required_columns: set[str], *, frame_n
     if missing_columns:
         missing = ", ".join(sorted(missing_columns))
         raise ValueError(f"{frame_name} is missing required columns: {missing}.")
+
+
+def _coerce_optional_int(value: Any) -> int | None:
+    """Return an integer for scalar backend identifiers."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_optional_float(value: Any) -> float | None:
+    """Return a finite float for scalar limit values."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(number):
+        return None
+    return number
+
+
+def _coerce_mapping(value: Any) -> dict[str, Any]:
+    """Return a mapping from raw backend JSON-like values."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return {}
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+        return dict(decoded) if isinstance(decoded, Mapping) else {}
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _permissable_frequency_pair(additional_data: Mapping[str, Any]) -> tuple[float, float] | None:
+    """Return normalized bottom/top frequency limits from metadata."""
+    raw_value = additional_data.get(_PERMISSABLE_FREQUENCY_KEY)
+    if isinstance(raw_value, str):
+        try:
+            raw_value = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(raw_value, (list, tuple)) or len(raw_value) < 2:
+        return None
+    first = _coerce_optional_float(raw_value[0])
+    second = _coerce_optional_float(raw_value[1])
+    if first is None or second is None:
+        return None
+    return (min(first, second), max(first, second))
+
+
+def _source_url_from_analysis_record(record: Mapping[str, Any]) -> str | None:
+    """Return a web URL from the parent analysis metadata."""
+    for key in ("source_url", "source"):
+        value = record.get(key)
+        if value is None or (isinstance(value, float) and pd.isna(value)):
+            continue
+        source_url = str(value)
+        if source_url:
+            return source_url
+    return None
+
+
+def _analysis_metadata_by_id(
+    analysis_frame: pd.DataFrame | None,
+) -> tuple[dict[int, dict[str, Any]], dict[str, Any] | None]:
+    """Index parent analysis metadata by backend analysis id."""
+    if analysis_frame is None or analysis_frame.empty:
+        return {}, None
+
+    metadata_by_id: dict[int, dict[str, Any]] = {}
+    metadata_rows: list[dict[str, Any]] = []
+    for record in analysis_frame.to_dict(orient="records"):
+        additional_data = _coerce_mapping(record.get("additional_data"))
+        if not additional_data:
+            additional_data = _coerce_mapping(record.get("data_additional"))
+        metadata = {
+            "additional_data": additional_data,
+            "source_url": _source_url_from_analysis_record(record),
+        }
+        analysis_id = _coerce_optional_int(record.get("id"))
+        if analysis_id is None:
+            analysis_id = _coerce_optional_int(record.get("analysis_id"))
+        if analysis_id is not None:
+            metadata_by_id[analysis_id] = metadata
+        metadata_rows.append(metadata)
+    single_metadata = metadata_rows[0] if len(metadata_rows) == 1 else None
+    return metadata_by_id, single_metadata
 
 
 def _build_plot_source_query(
@@ -102,6 +204,9 @@ def assemble_frequency_verification_comparison_frame(sources_by_key: Mapping[str
     verification_source = sources_by_key.get(_VERIFICATION_SOURCE_KEY)
     frequency_frame = pd.DataFrame() if frequency_source is None else frequency_source.frame
     verification_frame = pd.DataFrame() if verification_source is None else verification_source.frame
+    analysis_metadata_by_id, single_analysis_metadata = _analysis_metadata_by_id(
+        None if verification_source is None else verification_source.analysis_frame
+    )
 
     if not frequency_frame.empty:
         _require_columns(
@@ -128,6 +233,11 @@ def assemble_frequency_verification_comparison_frame(sources_by_key: Mapping[str
                     "hover_name": str(record["turbine"]),
                     "reference_label": reference_label,
                     "reference_order": frequency_reference_order[(metric, reference_label)],
+                    "source_url": None,
+                    "result_permissable_frequency_lower": None,
+                    "result_permissable_frequency_upper": None,
+                    "analysis_permissable_frequency_lower": None,
+                    "analysis_permissable_frequency_upper": None,
                 }
             )
 
@@ -139,6 +249,21 @@ def assemble_frequency_verification_comparison_frame(sources_by_key: Mapping[str
         )
         for record in verification_frame.to_dict(orient="records"):
             timestamp = pd.to_datetime(record["x"], utc=True, errors="coerce")
+            result_additional_data = _coerce_mapping(record.get("result_additional_data"))
+            if not result_additional_data:
+                result_additional_data = _coerce_mapping(record.get("additional_data"))
+            if not result_additional_data:
+                result_additional_data = _coerce_mapping(record.get("data_additional"))
+            analysis_id = _coerce_optional_int(record.get("analysis_id"))
+            analysis_metadata = (
+                analysis_metadata_by_id.get(analysis_id)
+                if analysis_id is not None
+                else single_analysis_metadata
+            )
+            if analysis_metadata is None:
+                analysis_metadata = single_analysis_metadata or {}
+            result_frequency = _permissable_frequency_pair(result_additional_data)
+            analysis_frequency = _permissable_frequency_pair(analysis_metadata.get("additional_data", {}))
             rows.append(
                 {
                     "asset": str(record["turbine"]),
@@ -149,6 +274,15 @@ def assemble_frequency_verification_comparison_frame(sources_by_key: Mapping[str
                     "hover_name": str(record["turbine"]),
                     "reference_label": None,
                     "reference_order": None,
+                    "source_url": analysis_metadata.get("source_url"),
+                    "result_permissable_frequency_lower": None if result_frequency is None else result_frequency[0],
+                    "result_permissable_frequency_upper": None if result_frequency is None else result_frequency[1],
+                    "analysis_permissable_frequency_lower": (
+                        None if analysis_frequency is None else analysis_frequency[0]
+                    ),
+                    "analysis_permissable_frequency_upper": (
+                        None if analysis_frequency is None else analysis_frequency[1]
+                    ),
                 }
             )
 
@@ -269,6 +403,16 @@ def _normalize_frequency_verification_frame(data: pd.DataFrame) -> pd.DataFrame:
         reference_order_by_label
     )
     frame["y"] = pd.to_numeric(frame["y"], errors="coerce")
+    frame["source_url"] = frame["source_url"].map(
+        lambda value: None if value is None or (isinstance(value, float) and pd.isna(value)) else str(value)
+    )
+    for column in (
+        "result_permissable_frequency_lower",
+        "result_permissable_frequency_upper",
+        "analysis_permissable_frequency_lower",
+        "analysis_permissable_frequency_upper",
+    ):
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
     return frame.loc[:, _NORMALIZED_COLUMNS].dropna(subset=["asset", "metric", "y"])
 
 
@@ -291,6 +435,189 @@ def _apply_verification_opacity(frame: pd.DataFrame) -> pd.DataFrame:
         1.0 - _VERIFICATION_MIN_OPACITY
     )
     return frame
+
+
+def _frequency_band_rows(frame: pd.DataFrame, prefix: str) -> pd.DataFrame:
+    """Return rows with parsed permissable-frequency limits."""
+    lower_column = f"{prefix}_permissable_frequency_lower"
+    upper_column = f"{prefix}_permissable_frequency_upper"
+    lower_values = pd.to_numeric(frame[lower_column], errors="coerce")
+    upper_values = pd.to_numeric(frame[upper_column], errors="coerce")
+    band_mask = lower_values.notna() & upper_values.notna()
+    if not band_mask.any():
+        return pd.DataFrame(columns=["asset", "metric", "lower", "upper"])
+
+    band_frame = frame.loc[band_mask, ["asset", "metric"]].copy()
+    band_frame["lower"] = lower_values.loc[band_mask].to_numpy()
+    band_frame["upper"] = upper_values.loc[band_mask].to_numpy()
+    normalized_lower = band_frame[["lower", "upper"]].min(axis=1)
+    normalized_upper = band_frame[["lower", "upper"]].max(axis=1)
+    band_frame["lower"] = normalized_lower
+    band_frame["upper"] = normalized_upper
+    return band_frame.drop_duplicates()
+
+
+def _single_band_pair(band_frame: pd.DataFrame) -> tuple[float, float] | None:
+    """Return the single unique bottom/top pair when one exists."""
+    unique_pairs = band_frame.loc[:, ["lower", "upper"]].drop_duplicates()
+    if len(unique_pairs) != 1:
+        return None
+    pair = unique_pairs.iloc[0]
+    return (float(pair["lower"]), float(pair["upper"]))
+
+
+def _resolve_frequency_band_from_prefix(
+    frame: pd.DataFrame,
+    *,
+    metric: str,
+    assets: list[str],
+    prefix: str,
+) -> dict[str, tuple[float, float]]:
+    """Resolve permissable-frequency limits for one metadata source."""
+    band_frame = _frequency_band_rows(frame, prefix)
+    if band_frame.empty:
+        return {}
+
+    global_pair = _single_band_pair(band_frame)
+    if global_pair is not None:
+        return dict.fromkeys(assets, global_pair)
+
+    metric_band_frame = band_frame[band_frame["metric"] == metric]
+    if metric_band_frame.empty:
+        return {}
+
+    metric_pair = _single_band_pair(metric_band_frame)
+    if metric_pair is not None:
+        return dict.fromkeys(assets, metric_pair)
+
+    fallback_pair = (float(metric_band_frame["lower"].min()), float(metric_band_frame["upper"].max()))
+    asset_pairs = {
+        str(asset): (float(asset_frame["lower"].min()), float(asset_frame["upper"].max()))
+        for asset, asset_frame in metric_band_frame.groupby("asset", sort=False)
+    }
+    return {asset: asset_pairs.get(asset, fallback_pair) for asset in assets}
+
+
+def _resolve_permissable_frequency_band(
+    frame: pd.DataFrame,
+    *,
+    metric: str,
+    assets: list[str],
+) -> dict[str, tuple[float, float]]:
+    """Resolve result-level permissable-frequency limits before analysis-level limits."""
+    result_limits = _resolve_frequency_band_from_prefix(frame, metric=metric, assets=assets, prefix="result")
+    if result_limits:
+        return result_limits
+
+    analysis_band_frame = _frequency_band_rows(frame, "analysis")
+    if analysis_band_frame.empty:
+        return {}
+    analysis_pair = (float(analysis_band_frame["lower"].min()), float(analysis_band_frame["upper"].max()))
+    return dict.fromkeys(assets, analysis_pair)
+
+
+def _add_permissable_frequency_band(
+    chart: Line,
+    x_values: list[str],
+    band_pairs: list[tuple[float, float] | None],
+) -> None:
+    """Add a filled red permissable-frequency band to a Cartesian line chart."""
+    if not any(pair is not None for pair in band_pairs):
+        return
+    if _global_permissable_frequency_band(band_pairs) is not None:
+        return
+
+    lower_values = [None if pair is None else pair[0] for pair in band_pairs]
+    height_values = [None if pair is None else pair[1] - pair[0] for pair in band_pairs]
+    hidden_tooltip = opts.TooltipOpts(is_show=False)
+    band = Bar()
+    band.add_xaxis(x_values)
+    band.add_yaxis(
+        "_Permissable Frequency Lower",
+        cast(Any, lower_values),
+        stack=_PERMISSABLE_BAND_STACK,
+        color=_PERMISSABLE_BAND_COLOR,
+        bar_width="92%",
+        label_opts=_label_opts(is_show=False),
+        itemstyle_opts=opts.ItemStyleOpts(color=_PERMISSABLE_BAND_COLOR, opacity=0),
+        tooltip_opts=hidden_tooltip,
+        z=0,
+    )
+    band.add_yaxis(
+        "Permissable Frequency Band",
+        cast(Any, height_values),
+        stack=_PERMISSABLE_BAND_STACK,
+        color=_PERMISSABLE_BAND_COLOR,
+        bar_width="92%",
+        label_opts=_label_opts(is_show=False),
+        itemstyle_opts=opts.ItemStyleOpts(color=_PERMISSABLE_BAND_COLOR, opacity=_PERMISSABLE_BAND_OPACITY),
+        tooltip_opts=hidden_tooltip,
+        z=0,
+    )
+    chart.overlap(band)
+
+
+def _global_permissable_frequency_band(
+    band_pairs: list[tuple[float, float] | None],
+) -> tuple[float, float] | None:
+    """Return the single visible band when the current chart has one."""
+    unique_pairs = {pair for pair in band_pairs if pair is not None}
+    if len(unique_pairs) != 1:
+        return None
+    return next(iter(unique_pairs))
+
+
+def _permissable_frequency_mark_area(pair: tuple[float, float]) -> dict[str, Any]:
+    """Return an ECharts markArea option for a global frequency band."""
+    return opts.MarkAreaOpts(
+        is_silent=True,
+        label_opts=_label_opts(is_show=False),
+        data=[[{"yAxis": pair[0]}, {"yAxis": pair[1]}]],
+        itemstyle_opts=opts.ItemStyleOpts(color=_PERMISSABLE_BAND_COLOR, opacity=_PERMISSABLE_BAND_OPACITY),
+    ).opts
+
+
+def _add_global_permissable_frequency_mark_area(
+    chart: Line,
+    band_pairs: list[tuple[float, float] | None],
+) -> None:
+    """Attach a global shaded y-band to the first Cartesian series."""
+    pair = _global_permissable_frequency_band(band_pairs)
+    series = chart.options.get("series")
+    if pair is None or not isinstance(series, list) or not series or not isinstance(series[0], dict):
+        return
+    series[0]["markArea"] = _permissable_frequency_mark_area(pair)
+
+
+def _add_permissable_frequency_limit_points(
+    chart: Line,
+    x_values: list[str],
+    band_pairs: list[tuple[float, float] | None],
+) -> None:
+    """Add invisible points so ECharts includes band limits in natural scaling."""
+    points: list[dict[str, Any]] = []
+    for x_value, pair in zip(x_values, band_pairs, strict=True):
+        if pair is None:
+            continue
+        points.extend(
+            [
+                {"value": [x_value, pair[0]]},
+                {"value": [x_value, pair[1]]},
+            ]
+        )
+    if not points:
+        return
+    scatter = Scatter()
+    scatter.add_xaxis(x_values)
+    scatter.add_yaxis(
+        "_Permissable Frequency Limits",
+        cast(Any, points),
+        symbol_size=0,
+        label_opts=_label_opts(is_show=False),
+        itemstyle_opts=opts.ItemStyleOpts(opacity=0),
+        tooltip_opts=opts.TooltipOpts(is_show=False),
+    )
+    chart.overlap(scatter)
 
 
 def _set_line_legend(chart: Line, line_series_names: list[str]) -> None:
@@ -318,9 +645,23 @@ def _asset_verification_tooltip() -> JsCode:
         "  if (!Array.isArray(value) || value.length < 4) {"
         "    return params.name;"
         "  }"
+        "  function escapeHtml(raw) {"
+        "    return String(raw).replace(/[&<>\"]/g, function (match) {"
+        "      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;'}[match];"
+        "    });"
+        "  }"
+        "  var source = value.length > 4 ? value[4] : null;"
+        "  var sourceLine = '';"
+        "  var sourceText = source ? String(source) : '';"
+        "  if (sourceText) {"
+        "    var escapedSource = escapeHtml(sourceText);"
+        "    sourceLine = '<br/>Source: <a href=\"' + escapedSource"
+        "      + '\" target=\"_blank\" rel=\"noopener noreferrer\">link</a>';"
+        "  }"
         "  return '<strong>' + value[2] + '</strong>'"
         "    + '<br/>Frequency: ' + Number(value[1]).toFixed(4) + ' Hz'"
-        "    + '<br/>Timestamp: ' + value[3];"
+        "    + '<br/>Timestamp: ' + value[3]"
+        "    + sourceLine;"
         "}"
     )
 
@@ -345,6 +686,7 @@ def _asset_frequency_tooltip() -> JsCode:
 
 def _build_frequency_verification_asset_chart(
     metric_frame: pd.DataFrame,
+    source_frame: pd.DataFrame,
 ) -> Line | None:
     """Build one asset/metric chart with verification markers and frequency levels."""
     verification_frame = metric_frame.dropna(subset=["timestamp_epoch"]).sort_values("timestamp_epoch")
@@ -354,6 +696,12 @@ def _build_frequency_verification_asset_chart(
     x_values = list(dict.fromkeys(verification_frame["timestamp_label"].astype(str).tolist()))
     chart = Line(init_opts=opts.InitOpts(width="100%", height="420px"))
     chart.add_xaxis(x_values)
+    asset_values = sorted(metric_frame["asset"].astype(str).unique().tolist())
+    metric_name = str(metric_frame["metric"].iloc[0])
+    band_by_asset = _resolve_permissable_frequency_band(source_frame, metric=metric_name, assets=asset_values)
+    asset_band = band_by_asset.get(asset_values[0]) if len(asset_values) == 1 else None
+    band_pairs = [asset_band for _ in x_values]
+    _add_permissable_frequency_band(chart, x_values, band_pairs)
 
     actual_frame = metric_frame.dropna(subset=["reference_label"]).copy()
     line_series_names: list[str] = []
@@ -389,6 +737,7 @@ def _build_frequency_verification_asset_chart(
                 float(row["y"]),
                 str(row["hover_name"]),
                 str(row["timestamp_label"]),
+                row["source_url"],
             ],
             "itemStyle": {
                 "color": _VERIFICATION_COLOR,
@@ -405,9 +754,11 @@ def _build_frequency_verification_asset_chart(
         color=_VERIFICATION_COLOR,
         label_opts=_label_opts(is_show=False),
         itemstyle_opts=opts.ItemStyleOpts(color=_VERIFICATION_COLOR),
-        tooltip_opts=opts.TooltipOpts(trigger="item", formatter=_asset_verification_tooltip()),
+        tooltip_opts=opts.TooltipOpts(trigger="item", formatter=_asset_verification_tooltip(), is_enterable=True),
     )
     chart.overlap(scatter)
+    _add_global_permissable_frequency_mark_area(chart, band_pairs)
+    _add_permissable_frequency_limit_points(chart, x_values, band_pairs)
 
     chart.set_series_opts(label_opts=_label_opts(is_show=False))
     chart.set_global_opts(
@@ -441,6 +792,7 @@ def plot_frequency_verification_asset_history(data: pd.DataFrame) -> Any:
     for metric, metric_frame in frame.groupby("metric", sort=True):
         chart = _build_frequency_verification_asset_chart(
             metric_frame.copy(),
+            frame,
         )
         if chart is not None:
             charts_by_metric[str(metric)] = chart
@@ -463,9 +815,23 @@ def plot_frequency_verification_comparison(data: pd.DataFrame) -> Any:
         "  if (!Array.isArray(value) || value.length < 4) {"
         "    return params.name;"
         "  }"
+        "  function escapeHtml(raw) {"
+        "    return String(raw).replace(/[&<>\"]/g, function (match) {"
+        "      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;'}[match];"
+        "    });"
+        "  }"
+        "  var source = value.length > 4 ? value[4] : null;"
+        "  var sourceLine = '';"
+        "  var sourceText = source ? String(source) : '';"
+        "  if (sourceText) {"
+        "    var escapedSource = escapeHtml(sourceText);"
+        "    sourceLine = '<br/>Source: <a href=\"' + escapedSource"
+        "      + '\" target=\"_blank\" rel=\"noopener noreferrer\">link</a>';"
+        "  }"
         "  return '<strong>' + value[0] + '</strong>'"
         "    + '<br/>Frequency: ' + Number(value[1]).toFixed(4) + ' Hz'"
-        "    + '<br/>Timestamp: ' + value[3];"
+        "    + '<br/>Timestamp: ' + value[3]"
+        "    + sourceLine;"
         "}"
     )
     frequency_tooltip = JsCode(
@@ -489,6 +855,9 @@ def plot_frequency_verification_comparison(data: pd.DataFrame) -> Any:
         chart = Line(init_opts=opts.InitOpts(width="100%", height="420px"))
         x_values = sorted(chart_frame["asset"].astype(str).unique().tolist())
         chart.add_xaxis(x_values)
+        band_by_asset = _resolve_permissable_frequency_band(frame, metric=str(metric), assets=x_values)
+        band_pairs = [band_by_asset.get(asset) for asset in x_values]
+        _add_permissable_frequency_band(chart, x_values, band_pairs)
 
         actual_frame = chart_frame.dropna(subset=["reference_label"]).copy()
         line_series_names: list[str] = []
@@ -524,7 +893,13 @@ def plot_frequency_verification_comparison(data: pd.DataFrame) -> Any:
             verification_points = [
                 {
                     "name": str(row["hover_name"]),
-                    "value": [str(row["asset"]), float(row["y"]), str(row["hover_name"]), str(row["timestamp_label"])],
+                    "value": [
+                        str(row["asset"]),
+                        float(row["y"]),
+                        str(row["hover_name"]),
+                        str(row["timestamp_label"]),
+                        row["source_url"],
+                    ],
                     "itemStyle": {
                         "color": _VERIFICATION_COLOR,
                         "opacity": float(row["verification_opacity"]),
@@ -540,9 +915,11 @@ def plot_frequency_verification_comparison(data: pd.DataFrame) -> Any:
                 color=_VERIFICATION_COLOR,
                 label_opts=_label_opts(is_show=False),
                 itemstyle_opts=opts.ItemStyleOpts(color=_VERIFICATION_COLOR),
-                tooltip_opts=opts.TooltipOpts(trigger="item", formatter=verification_tooltip),
+                tooltip_opts=opts.TooltipOpts(trigger="item", formatter=verification_tooltip, is_enterable=True),
             )
             chart.overlap(scatter)
+        _add_global_permissable_frequency_mark_area(chart, band_pairs)
+        _add_permissable_frequency_limit_points(chart, x_values, band_pairs)
 
         chart.set_series_opts(label_opts=_label_opts(is_show=False))
         chart.set_global_opts(
