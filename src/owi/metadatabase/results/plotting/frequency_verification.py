@@ -163,6 +163,28 @@ def _render_frequency_verification_plot(
     return plot_frequency_verification_comparison(assemble_frequency_verification_comparison_frame(sources_by_key))
 
 
+def _render_frequency_verification_asset_plot(
+    sources_by_key: Mapping[str, PlotSourceData],
+    request: Any,
+) -> Any:
+    """Render the cross-analysis asset frequency/verification plot."""
+    del request
+    empty_sources = [
+        source_key
+        for source_key in (_FREQUENCY_SOURCE_KEY, _VERIFICATION_SOURCE_KEY)
+        if sources_by_key.get(source_key) is None or sources_by_key[source_key].frame.empty
+    ]
+    if empty_sources:
+        missing = ", ".join(empty_sources)
+        raise ValueError(
+            "No frequency verification data is available to plot after filtering. "
+            f"Empty sources: {missing}."
+        )
+    return plot_frequency_verification_asset_history(
+        assemble_frequency_verification_comparison_frame(sources_by_key)
+    )
+
+
 def build_frequency_verification_plot_definition() -> PlotDefinition:
     """Return the registered cross-analysis fleetwide frequency/verification plot definition."""
     return PlotDefinition(
@@ -173,6 +195,19 @@ def build_frequency_verification_plot_definition() -> PlotDefinition:
         plot_type="cross_analysis_fleetwide",
         build_sources=_build_frequency_verification_sources,
         render=_render_frequency_verification_plot,
+    )
+
+
+def build_frequency_verification_asset_plot_definition() -> PlotDefinition:
+    """Return the registered cross-analysis per-asset frequency/verification plot definition."""
+    return PlotDefinition(
+        supported_analysis_names=(
+            LIFETIME_DESIGN_FREQUENCIES_ANALYSIS_NAME,
+            LIFETIME_DESIGN_VERIFICATION_ANALYSIS_NAME,
+        ),
+        plot_type="cross_analysis_asset",
+        build_sources=_build_frequency_verification_sources,
+        render=_render_frequency_verification_asset_plot,
     )
 
 
@@ -272,6 +307,146 @@ def _set_legend_only_layout(chart: Line) -> None:
         return
     if isinstance(grid, dict):
         grid["top"] = "22%"
+
+
+def _asset_verification_tooltip() -> JsCode:
+    """Return verification tooltip JS for asset history plots."""
+    return JsCode(
+        "function (params) {"
+        "  var value = params && params.data ? params.data.value : null;"
+        "  if (!Array.isArray(value) || value.length < 4) {"
+        "    return params.name;"
+        "  }"
+        "  return '<strong>' + value[2] + '</strong>'"
+        "    + '<br/>Frequency: ' + Number(value[1]).toFixed(4) + ' Hz'"
+        "    + '<br/>Timestamp: ' + value[3];"
+        "}"
+    )
+
+
+def _asset_frequency_tooltip() -> JsCode:
+    """Return frequency-level tooltip JS for asset history plots."""
+    return JsCode(
+        "function (params) {"
+        "  var rawValue = params && params.data != null ? params.data : params.value;"
+        "  if (Array.isArray(rawValue)) {"
+        "    rawValue = rawValue.length > 1 ? rawValue[1] : rawValue[0];"
+        "  }"
+        "  if (rawValue == null || rawValue === '') {"
+        "    return params && params.name ? params.name : '';"
+        "  }"
+        "  return '<strong>' + params.seriesName + '</strong>'"
+        "    + '<br/>Timestamp: ' + params.name"
+        "    + '<br/>Frequency: ' + Number(rawValue).toFixed(4) + ' Hz';"
+        "}"
+    )
+
+
+def _build_frequency_verification_asset_chart(
+    metric_frame: pd.DataFrame,
+) -> Line | None:
+    """Build one asset/metric chart with verification markers and frequency levels."""
+    verification_frame = metric_frame.dropna(subset=["timestamp_epoch"]).sort_values("timestamp_epoch")
+    if verification_frame.empty:
+        return None
+
+    x_values = list(dict.fromkeys(verification_frame["timestamp_label"].astype(str).tolist()))
+    chart = Line(init_opts=opts.InitOpts(width="100%", height="420px"))
+    chart.add_xaxis(x_values)
+
+    actual_frame = metric_frame.dropna(subset=["reference_label"]).copy()
+    line_series_names: list[str] = []
+    if not actual_frame.empty:
+        reference_order = (
+            actual_frame.groupby("reference_label")["reference_order"]
+            .min()
+            .sort_values(kind="stable")
+            .index.tolist()
+        )
+        for color_index, reference_label in enumerate(reference_order):
+            color = _REFERENCE_LINE_COLORS[color_index % len(_REFERENCE_LINE_COLORS)]
+            reference_frame = actual_frame[actual_frame["reference_label"] == reference_label]
+            reference_value = float(reference_frame["y"].iloc[0])
+            chart.add_yaxis(
+                str(reference_label),
+                cast(Any, [reference_value for _ in x_values]),
+                is_smooth=False,
+                is_symbol_show=False,
+                color=color,
+                linestyle_opts=opts.LineStyleOpts(type_="dashed", color=color),
+                tooltip_opts=opts.TooltipOpts(trigger="item", formatter=_asset_frequency_tooltip()),
+            )
+            line_series_names.append(str(reference_label))
+
+    scatter = Scatter()
+    scatter.add_xaxis(x_values)
+    verification_points = [
+        {
+            "name": str(row["hover_name"]),
+            "value": [
+                str(row["timestamp_label"]),
+                float(row["y"]),
+                str(row["hover_name"]),
+                str(row["timestamp_label"]),
+            ],
+            "itemStyle": {
+                "color": _VERIFICATION_COLOR,
+                "opacity": 1.0,
+            },
+        }
+        for row in verification_frame.to_dict(orient="records")
+    ]
+    scatter.add_yaxis(
+        "Verification",
+        cast(Any, verification_points),
+        symbol="circle",
+        symbol_size=_VERIFICATION_SYMBOL_SIZE,
+        color=_VERIFICATION_COLOR,
+        label_opts=_label_opts(is_show=False),
+        itemstyle_opts=opts.ItemStyleOpts(color=_VERIFICATION_COLOR),
+        tooltip_opts=opts.TooltipOpts(trigger="item", formatter=_asset_verification_tooltip()),
+    )
+    chart.overlap(scatter)
+
+    chart.set_series_opts(label_opts=_label_opts(is_show=False))
+    chart.set_global_opts(
+        title_opts=opts.TitleOpts(is_show=False),
+        legend_opts=_legend_opts(),
+        tooltip_opts=_tooltip_opts(trigger="item"),
+        xaxis_opts=_xaxis_opts(name="Datetime", rotate=30, boundary_gap=False),
+        yaxis_opts=_yaxis_opts(name="Frequency [Hz]"),
+    )
+    _set_line_legend(chart, line_series_names)
+    _apply_cartesian_layout(chart)
+    _set_legend_only_layout(chart)
+    return chart
+
+
+def plot_frequency_verification_asset_history(data: pd.DataFrame) -> Any:
+    """Plot one frequency/verification time history per asset and metric."""
+    frame = _normalize_frequency_verification_frame(data)
+    if frame.empty:
+        raise ValueError("No frequency verification data is available to plot.")
+
+    asset_names = sorted(frame["asset"].dropna().astype(str).unique().tolist())
+    if len(asset_names) > 1:
+        raise ValueError(
+            "cross_analysis_asset expects data for one asset. "
+            f"Filter to a single location or turbine; found: {', '.join(asset_names)}."
+        )
+
+    charts_by_metric: dict[str, Line] = {}
+    for metric, metric_frame in frame.groupby("metric", sort=True):
+        chart = _build_frequency_verification_asset_chart(
+            metric_frame.copy(),
+        )
+        if chart is not None:
+            charts_by_metric[str(metric)] = chart
+
+    if not charts_by_metric:
+        raise ValueError("No dated verification data is available to plot.")
+
+    return build_dropdown_plot_response(charts_by_metric, dropdown_label="Metric")
 
 
 def plot_frequency_verification_comparison(data: pd.DataFrame) -> Any:
