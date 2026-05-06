@@ -12,7 +12,7 @@ from owi.metadatabase.results import LifetimeDesignFrequencies, WindSpeedHistogr
 from owi.metadatabase.results.analyses.lifetime_design_verification import LifetimeDesignVerification
 from owi.metadatabase.results.models import ResultQuery
 from owi.metadatabase.results.serializers import DjangoResultSerializer
-from owi.metadatabase.results.services import ResultsService
+from owi.metadatabase.results.services import ApiResultsRepository, ResultsService
 from owi.metadatabase.results.services import get_results as module_get_results
 from owi.metadatabase.results.services import plot_results as module_plot_results
 
@@ -71,6 +71,23 @@ class MultiAnalysisRepository(StubRepository):
     def list_results(self, query: Any) -> pd.DataFrame:
         self.queries.append(query)
         return self.frames_by_analysis.get(query.analysis_name, pd.DataFrame())
+
+
+def test_api_results_repository_list_results_uses_rest_id_filters() -> None:
+    class RecordingApi:
+        def __init__(self) -> None:
+            self.kwargs: dict[str, Any] | None = None
+
+        def list_results(self, **kwargs: Any) -> dict[str, pd.DataFrame]:
+            self.kwargs = kwargs
+            return {"data": pd.DataFrame()}
+
+    api = RecordingApi()
+    repository = ApiResultsRepository(api=api)  # type: ignore[arg-type]
+
+    repository.list_results(ResultQuery(analysis_id=17, location_id=9))
+
+    assert api.kwargs == {"analysis__id": 17, "location__id": 9}
 
 
 def test_wind_speed_histogram_to_results_and_plot() -> None:
